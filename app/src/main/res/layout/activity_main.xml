@@ -140,17 +140,6 @@
                     android:textSize="11sp" />
             </RadioGroup>
 
-            <!-- Открыть папку -->
-            <Button
-                android:id="@+id/btnOpenFolder"
-                android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/btn_outline_bg"
-                android:text="📂 Открыть папку с файлами"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp" />
-
             <!-- Кнопка Загрузить -->
             <Button
                 android:id="@+id/btnDownload"
@@ -181,9 +170,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:gravity="center"
             android:text="Готов к работе."
             android:textColor="#9CA3AF"
-            android:textSize="12sp" />
+            android:textSize="14sp" />
 
         <!-- Карточка результата -->
         <LinearLayout
@@ -236,6 +226,17 @@
             android:text=""
             android:textColor="#6B7280"
             android:textSize="10sp" />
+
+        <!-- Открыть папку -->
+        <Button
+            android:id="@+id/btnOpenFolder"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/btn_outline_bg"
+            android:text="📂 Открыть папку с файлами"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
 
         <!-- Скрытый WebView -->
         <WebView

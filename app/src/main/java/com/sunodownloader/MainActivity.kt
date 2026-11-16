@@ -14,8 +14,6 @@ import android.webkit.WebViewClient
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -113,7 +111,26 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Извлекаем ffmpeg из assets при первом запуске
+        extractFFmpeg()
+
         addLog("Приложение запущено.")
+    }
+
+    private fun extractFFmpeg() {
+        val target = File(filesDir, "ffmpeg")
+        if (target.exists() && target.canExecute()) return
+        try {
+            assets.open("ffmpeg").use { input ->
+                target.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            target.setExecutable(true, false)
+            addLog("FFmpeg извлечён: ${target.length() / 1024} КБ")
+        } catch (e: Exception) {
+            addLog("Не удалось извлечь FFmpeg: ${e.message}")
+        }
     }
 
     private fun showFolderDialog() {
@@ -404,18 +421,15 @@ class MainActivity : AppCompatActivity() {
             tmpM4a.writeBytes(audioBytes)
             addLog("Временный файл M4A: ${tmpM4a.length() / 1024} КБ")
 
+            val ffmpegPath = findFFmpeg()
             var finalPath: File
 
-            if (wantMp3) {
-                addLog("Конвертация в MP3 (FFmpegKit)...")
-                val coverFile: File? = if (coverData != null && coverData!!.isNotEmpty()) {
-                    val cf = File(outputDir, "_cover.jpg")
-                    cf.writeBytes(coverData!!)
-                    cf
-                } else null
-
-                val cmd = mutableListOf("-y", "-i", tmpM4a.absolutePath)
-                if (coverFile != null) {
+            if (wantMp3 && ffmpegPath != null) {
+                addLog("Конвертация в MP3 (ffmpeg: $ffmpegPath)...")
+                val cmd = mutableListOf(ffmpegPath, "-y", "-i", tmpM4a.absolutePath)
+                if (coverData != null && coverData!!.isNotEmpty()) {
+                    val coverFile = File(outputDir, "_cover.jpg")
+                    coverFile.writeBytes(coverData!!)
                     cmd += listOf("-i", coverFile.absolutePath, "-map", "0:a", "-map", "1:v")
                 }
                 cmd += listOf(
@@ -426,27 +440,24 @@ class MainActivity : AppCompatActivity() {
                     path.absolutePath
                 )
 
-                // Запускаем FFmpegKit синхронно
-                val command = cmd.joinToString(" ")
-                addLog("FFmpeg: $command")
-                val session = FFmpegKit.execute(command)
-                val rc = session.returnCode
-                
-                if (rc != null && ReturnCode.isSuccess(rc)) {
+                val process = ProcessBuilder(*cmd.toTypedArray()).redirectErrorStream(true).start()
+                val exitCode = process.waitFor()
+
+                if (exitCode == 0) {
                     finalPath = path
                     tmpM4a.delete()
-                    coverFile?.delete()
+                    File(outputDir, "_cover.jpg").delete()
                     addLog("MP3 готов: ${finalPath.length() / 1024} КБ")
                 } else {
-                    val log = session.output
-                    addLog("FFmpeg ошибка: $log")
+                    addLog("FFmpeg ошибка (код $exitCode), сохраняю M4A")
                     val m4aPath = File(outputDir, "${path.nameWithoutExtension}.m4a")
                     tmpM4a.renameTo(m4aPath)
                     finalPath = m4aPath
-                    coverFile?.delete()
+                    File(outputDir, "_cover.jpg").delete()
                 }
             } else {
-                addLog("Формат M4A выбран")
+                if (wantMp3) addLog("FFmpeg не найден на устройстве, сохраняю M4A")
+                else addLog("Формат M4A выбран")
                 val m4aPath = File(outputDir, "${path.nameWithoutExtension}.m4a")
                 tmpM4a.renameTo(m4aPath)
                 finalPath = m4aPath
@@ -469,6 +480,19 @@ class MainActivity : AppCompatActivity() {
             addLog("Ошибка сохранения: ${e.message}")
             runOnUiThread { showError("Ошибка сохранения: ${e.message}") }
         }
+    }
+
+    private fun findFFmpeg(): String? {
+        val candidates = listOf(
+            File(filesDir, "ffmpeg").absolutePath,
+            "/system/bin/ffmpeg",
+            "/system/xbin/ffmpeg",
+            "/data/local/bin/ffmpeg"
+        )
+        for (c in candidates) {
+            if (File(c).exists() && File(c).canExecute()) return c
+        }
+        return null
     }
 
     private fun showError(msg: String) {
