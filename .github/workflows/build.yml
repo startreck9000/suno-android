@@ -1,38 +1,36 @@
 name: Build APK
-
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-
       - name: Install Android SDK components
         run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0"
-
       - name: Create local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
-
+      - name: Download FFmpeg for Android
+        run: |
+          mkdir -p app/src/main/assets
+          curl -L -o /tmp/ffmpeg.zip "https://github.com/Tyrrrz/FFmpegBin/releases/download/v7.1/ffmpeg-7.1-android-arm64-v8a.zip"
+          unzip -j /tmp/ffmpeg.zip -d app/src/main/assets/
+          chmod +x app/src/main/assets/ffmpeg
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.5'
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
-
       - name: Upload APK
         if: always()
         uses: actions/upload-artifact@v4
