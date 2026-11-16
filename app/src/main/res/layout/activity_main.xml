@@ -11,6 +11,7 @@
         android:orientation="vertical"
         android:padding="20dp">
 
+        <!-- Шапка -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -23,10 +24,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Вставьте ссылку на публичную песню Suno"
+            android:text="Вставьте ссылку на публичную песню Suno\n(https://suno.com/s/... или https://suno.com/song/...)"
             android:textColor="#9CA3AF"
             android:textSize="12sp" />
 
+        <!-- Карточка -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -35,6 +37,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
+            <!-- Поле ввода -->
             <EditText
                 android:id="@+id/etUrl"
                 android:layout_width="match_parent"
@@ -49,6 +52,7 @@
                 android:textColorHint="#5A5A6A"
                 android:textSize="14sp" />
 
+            <!-- Кнопки Вставить / Очистить -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -80,15 +84,35 @@
                     android:textSize="12sp" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/tvFolder"
+            <!-- Папка сохранения -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text=""
-                android:textColor="#9CA3AF"
-                android:textSize="11sp" />
+                android:orientation="horizontal">
 
+                <TextView
+                    android:id="@+id/tvFolder"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text=""
+                    android:textColor="#9CA3AF"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/btnBrowse"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:background="@drawable/btn_outline_bg"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="12dp"
+                    android:text="Обзор..."
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Кнопка Загрузить -->
             <Button
                 android:id="@+id/btnDownload"
                 android:layout_width="match_parent"
@@ -101,6 +125,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Прогресс -->
         <ProgressBar
             android:id="@+id/progressbar"
             style="?android:attr/progressBarStyleHorizontal"
@@ -121,6 +146,7 @@
             android:textColor="#9CA3AF"
             android:textSize="12sp" />
 
+        <!-- Карточка результата -->
         <LinearLayout
             android:id="@+id/resultCard"
             android:layout_width="match_parent"
@@ -168,6 +194,21 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
+        <!-- Лог -->
+        <TextView
+            android:id="@+id/logText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/card_bg"
+            android:fontFamily="monospace"
+            android:maxLines="8"
+            android:padding="10dp"
+            android:text=""
+            android:textColor="#6B7280"
+            android:textSize="10sp" />
+
+        <!-- Скрытый WebView -->
         <WebView
             android:id="@+id/webview"
             android:layout_width="1dp"
