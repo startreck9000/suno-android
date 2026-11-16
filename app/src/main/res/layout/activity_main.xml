@@ -112,6 +112,34 @@
                     android:textSize="11sp" />
             </LinearLayout>
 
+            <!-- Формат -->
+            <RadioGroup
+                android:id="@+id/rgFormat"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/rbMp3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checked="true"
+                    android:text="MP3 (если есть FFmpeg)"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp" />
+
+                <RadioButton
+                    android:id="@+id/rbM4a"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="M4A (оригинал)"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp" />
+            </RadioGroup>
+
             <!-- Кнопка Загрузить -->
             <Button
                 android:id="@+id/btnDownload"

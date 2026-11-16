@@ -375,14 +375,27 @@ class MainActivity : AppCompatActivity() {
             val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim('.', ' ').take(150)
             val fileName = if (safeName.isNotEmpty()) safeName else "track"
 
+            // Формат из RadioButton
+            val wantMp3 = findViewById<RadioButton>(R.id.rbMp3).isChecked
+
             addLog("Сохраняю в: ${outputDir.absolutePath}")
             outputDir.mkdirs()
 
-            var path = File(outputDir, "$fileName.mp3")
-            var i = 1
-            while (path.exists()) {
-                path = File(outputDir, "$fileName($i).mp3")
-                i++
+            var path: File
+            if (wantMp3) {
+                path = File(outputDir, "$fileName.mp3")
+                var i = 1
+                while (path.exists()) {
+                    path = File(outputDir, "$fileName($i).mp3")
+                    i++
+                }
+            } else {
+                path = File(outputDir, "$fileName.m4a")
+                var i = 1
+                while (path.exists()) {
+                    path = File(outputDir, "$fileName($i).m4a")
+                    i++
+                }
             }
 
             val tmpM4a = File(outputDir, "_tmp_${songId.take(8)}.m4a")
@@ -392,7 +405,7 @@ class MainActivity : AppCompatActivity() {
             val ffmpegPath = findFFmpeg()
             var finalPath: File
 
-            if (ffmpegPath != null) {
+            if (wantMp3 && ffmpegPath != null) {
                 addLog("Конвертация в MP3 (ffmpeg: $ffmpegPath)...")
                 val cmd = mutableListOf(ffmpegPath, "-y", "-i", tmpM4a.absolutePath)
                 if (coverData != null && coverData!!.isNotEmpty()) {
@@ -424,7 +437,8 @@ class MainActivity : AppCompatActivity() {
                     File(outputDir, "_cover.jpg").delete()
                 }
             } else {
-                addLog("FFmpeg не найден, сохраняю M4A")
+                if (wantMp3) addLog("FFmpeg не найден, сохраняю M4A вместо MP3")
+                else addLog("Формат M4A выбран")
                 val m4aPath = File(outputDir, "${path.nameWithoutExtension}.m4a")
                 tmpM4a.renameTo(m4aPath)
                 finalPath = m4aPath
@@ -482,13 +496,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openFolder() {
+        val dir = outputDir
+        // Пробуем открыть через файловый менеджер
         try {
             val intent = Intent(Intent.ACTION_VIEW)
-            intent.setDataAndType(Uri.fromFile(outputDir), "resource/folder")
+            intent.setDataAndType(Uri.fromFile(dir), "resource/folder")
             startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(this, outputDir.absolutePath, Toast.LENGTH_LONG).show()
-        }
+            return
+        } catch (_: Exception) {}
+        // Альтернатива: открываем корневой /storage/emulated/0
+        try {
+            val intent = Intent(Intent.ACTION_VIEW)
+            intent.setDataAndType(Uri.fromFile(File("/storage/emulated/0")), "resource/folder")
+            startActivity(intent)
+            return
+        } catch (_: Exception) {}
+        // Если ничего не открылось — показываем путь
+        Toast.makeText(this, "Папка: ${dir.absolutePath}", Toast.LENGTH_LONG).show()
     }
 
     override fun onDestroy() {
