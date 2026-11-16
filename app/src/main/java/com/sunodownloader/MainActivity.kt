@@ -1,11 +1,12 @@
 package com.sunodownloader
 
 import android.annotation.SuppressLint
-import android.app.Activity
+
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -303,7 +304,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveFile(audioBytes: ByteArray, title: String) {
         try {
-            val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim('. ', 150)
+            val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim('.', ' ').take(150)
             val fileName = if (safeName.isNotEmpty()) safeName else "track"
 
             // Уникальное имя
@@ -418,7 +419,7 @@ class MainActivity : AppCompatActivity() {
     fun openFolder() {
         try {
             val intent = Intent(Intent.ACTION_VIEW)
-            intent.setDataAndType(Uri.fromFile(File(outputDir)), "resource/folder")
+            intent.setDataAndType(Uri.fromFile(outputDir)), "resource/folder")
             startActivity(intent)
         } catch (e: Exception) {
             Toast.makeText(this, outputDir.absolutePath, Toast.LENGTH_LONG).show()
