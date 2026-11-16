@@ -419,7 +419,7 @@ class MainActivity : AppCompatActivity() {
     fun openFolder() {
         try {
             val intent = Intent(Intent.ACTION_VIEW)
-            intent.setDataAndType(Uri.fromFile(outputDir)), "resource/folder")
+            intent.setDataAndType(Uri.fromFile(outputDir), "resource/folder")
             startActivity(intent)
         } catch (e: Exception) {
             Toast.makeText(this, outputDir.absolutePath, Toast.LENGTH_LONG).show()
