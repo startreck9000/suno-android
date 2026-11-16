@@ -1,7 +1,6 @@
 package com.sunodownloader
 
 import android.annotation.SuppressLint
-
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -16,6 +15,8 @@ import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -27,13 +28,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var resultCard: LinearLayout
     private lateinit var resultTitle: TextView
     private lateinit var resultSize: TextView
+    private lateinit var logText: TextView
     private var isBusy = false
     private var coverData: ByteArray? = null
     private var trackTitle: String = ""
     private var songId: String = ""
-    private val outputDir by lazy {
-        File(getExternalFilesDir(Environment.DIRECTORY_MUSIC), "Suno").apply { mkdirs() }
-    }
+    private var selectedDir: File? = null
+    private val outputDir: File
+        get() = selectedDir ?: File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Suno").apply { mkdirs() }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,6 +48,7 @@ class MainActivity : AppCompatActivity() {
         resultCard = findViewById(R.id.resultCard)
         resultTitle = findViewById(R.id.resultTitle)
         resultSize = findViewById(R.id.resultSize)
+        logText = findViewById(R.id.logText)
 
         // Кнопки
         findViewById<Button>(R.id.btnDownload).setOnClickListener {
@@ -68,6 +71,16 @@ class MainActivity : AppCompatActivity() {
             openFolder()
         }
 
+        // Кнопка выбора папки
+        findViewById<Button>(R.id.btnBrowse).setOnClickListener {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+            try {
+                startActivityForResult(intent, 1001)
+            } catch (e: Exception) {
+                Toast.makeText(this, "Не удалось открыть выбор папки", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         // Папка сохранения
         findViewById<TextView>(R.id.tvFolder).text = "Папка: ${outputDir.absolutePath}"
 
@@ -78,13 +91,11 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
-        // Скрываем WebView (работает в фоне)
+        // Настройка WebView
         webView.visibility = View.GONE
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.mediaPlaybackRequiresUserGesture = false
-
-        // Добавляем JS-интерфейс для обратных вызовов
         webView.addJavascriptInterface(DownloadBridge(), "Android")
 
         webView.webViewClient = object : WebViewClient() {
@@ -96,10 +107,12 @@ class MainActivity : AppCompatActivity() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
                 if (!isBusy) return
                 runOnUiThread {
-                    progressbar.progress = newProgress / 2  // до 50% на загрузку страницы
+                    progressbar.progress = newProgress / 2
                 }
             }
         }
+
+        addLog("Приложение запущено.")
     }
 
     inner class DownloadBridge {
@@ -119,8 +132,17 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun log(msg: String) {
-            // Логирование (необязательно)
+            runOnUiThread {
+                addLog(msg)
+            }
         }
+    }
+
+    private fun addLog(msg: String) {
+        val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+        val line = "[$time] $msg\n"
+        val current = logText.text.toString()
+        logText.text = current + line
     }
 
     fun startDownload(url: String) {
@@ -130,7 +152,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Извлекаем song ID
         val idMatch = Regex("/song/([a-f0-9\\-]{36})").find(url)
         val shortMatch = Regex("/s/([A-Za-z0-9]+)").find(url)
 
@@ -144,10 +165,11 @@ class MainActivity : AppCompatActivity() {
         setButtonState(true)
         progressbar.progress = 0
         statusText.text = "Запуск..."
+        addLog("Загрузка: $url")
 
         Thread {
             try {
-                // Разворачиваем короткую ссылку если нужно
+                // Разворачиваем короткую ссылку
                 var fullUrl = url
                 if (shortMatch != null && idMatch == null) {
                     try {
@@ -166,51 +188,59 @@ class MainActivity : AppCompatActivity() {
                     ?: shortMatch!!.groupValues[1]
 
                 songId = sid
-                runOnUiThread { statusText.text = "Подключение к серверу..." }
+                runOnUiThread {
+                    statusText.text = "Подключение..."
+                    addLog("Song ID: $sid")
+                }
 
-                // Загружаем usesuno.com
+                // Загружаем usesuno.com через UI-поток
                 val loaded = CountDownLatch(1)
                 var loadError: String? = null
 
-                webView.webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView, url: String) {
-                        loaded.countDown()
+                runOnUiThread {
+                    webView.webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView, url: String) {
+                            loaded.countDown()
+                        }
+                        override fun onReceivedError(view: WebView, errorCode: Int, description: String?, failingUrl: String?) {
+                            loadError = description ?: "HTTP $errorCode"
+                            loaded.countDown()
+                        }
                     }
-                    override fun onReceivedError(view: WebView, errorCode: Int, description: String?, failingUrl: String?) {
-                        loadError = description ?: "HTTP $errorCode"
-                        loaded.countDown()
-                    }
+                    webView.loadUrl("https://usesuno.com/tools/downloader/")
                 }
 
-                webView.loadUrl("https://usesuno.com/tools/downloader/")
-
-                // Ждём загрузку (до 30 сек)
                 loaded.await(30, TimeUnit.SECONDS)
 
                 if (loadError != null) {
-                    runOnUiThread { showError("Ошибка загрузки: $loadError\nПроверьте интернет.") }
+                    runOnUiThread { showError("Ошибка загрузки: $loadError") }
                     return@Thread
                 }
 
-                // Ждём SunoAudioDecoder (Cloudflare challenge)
-                runOnUiThread { statusText.text = "Ожидание Cloudflare..." }
+                runOnUiThread { addLog("Страница загружена. Ожидание Cloudflare...") }
 
+                // Ждём SunoAudioDecoder
                 var decoderReady = false
                 for (i in 0..60) {
                     Thread.sleep(500)
                     val check = CountDownLatch(1)
                     var result = ""
-                    webView.evaluateJavascript(
-                        "(document.readyState === 'complete' && !!window.SunoAudioDecoder) ? 'OK' : document.title || 'loading'",
-                        { value -> result = value; check.countDown() }
-                    )
+                    runOnUiThread {
+                        webView.evaluateJavascript(
+                            "(document.readyState === 'complete' && !!window.SunoAudioDecoder) ? 'OK' : document.title || 'loading'",
+                            { value -> result = value; check.countDown() }
+                        )
+                    }
                     check.await(5, TimeUnit.SECONDS)
                     if (result.contains("\"OK\"")) {
                         decoderReady = true
                         break
                     }
                     if (i % 10 == 9) {
-                        runOnUiThread { statusText.text = "Ожидание... (${i * 0.5}с)" }
+                        runOnUiThread {
+                            statusText.text = "Ожидание... (${i * 0.5}с)"
+                            addLog("Ждём декодер... (${i * 0.5}с)")
+                        }
                     }
                 }
 
@@ -224,9 +254,10 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     statusText.text = "Скачивание трека..."
                     progressbar.progress = 50
+                    addLog("Декодер готов. Скачивание аудио...")
                 }
 
-                // Вызываем getAudio + получаем название
+                // Вызываем getAudio через UI-поток
                 val jsCode = """
                     (async function() {
                         var contentId = '$songId';
@@ -257,10 +288,12 @@ class MainActivity : AppCompatActivity() {
                     })()
                 """.trimIndent()
 
-                webView.evaluateJavascript(jsCode, null)
+                runOnUiThread {
+                    webView.evaluateJavascript(jsCode, null)
+                }
 
-                // Ждём результат (до 60 сек)
-                Thread.sleep(60000)
+                // Ждём результат (до 90 сек)
+                Thread.sleep(90000)
 
             } catch (e: Exception) {
                 runOnUiThread { showError("Ошибка: ${e.message}") }
@@ -272,14 +305,13 @@ class MainActivity : AppCompatActivity() {
         try {
             trackTitle = title
             val audioBytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+            addLog("Аудио: ${size / 1024} КБ, Title: $title")
 
-            runOnUiThread {
-                statusText.text = "Сохранение..."
-                progressbar.progress = 80
-            }
+            statusText.text = "Сохранение..."
+            progressbar.progress = 80
 
-            // Скачиваем обложку
             Thread {
+                // Скачиваем обложку
                 var cover: ByteArray? = null
                 try {
                     val coverUrl = "https://cdn2.suno.ai/image_large_${songId}.jpeg"
@@ -292,13 +324,13 @@ class MainActivity : AppCompatActivity() {
                     conn.disconnect()
                 } catch (_: Exception) {}
                 coverData = cover
+                if (cover != null) addLog("Обложка: ${cover.size / 1024} КБ")
 
-                // Сохраняем файл
                 saveFile(audioBytes, title)
             }.start()
 
         } catch (e: Exception) {
-            showError("Ошибка сохранения: ${e.message}")
+            showError("Ошибка: ${e.message}")
         }
     }
 
@@ -307,7 +339,6 @@ class MainActivity : AppCompatActivity() {
             val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim('.', ' ').take(150)
             val fileName = if (safeName.isNotEmpty()) safeName else "track"
 
-            // Уникальное имя
             var path = File(outputDir, "$fileName.mp3")
             var i = 1
             while (path.exists()) {
@@ -315,15 +346,14 @@ class MainActivity : AppCompatActivity() {
                 i++
             }
 
-            // Пишем M4A во временный файл
             val tmpM4a = File(outputDir, "_tmp_${songId.take(8)}.m4a")
             tmpM4a.writeBytes(audioBytes)
 
-            // Пытаемся конвертировать в MP3 через ffmpeg (если есть)
             val ffmpegPath = findFFmpeg()
             var finalPath: File
 
             if (ffmpegPath != null) {
+                addLog("Конвертация в MP3...")
                 val cmd = mutableListOf(ffmpegPath, "-y", "-i", tmpM4a.absolutePath)
                 if (coverData != null && coverData!!.isNotEmpty()) {
                     val coverFile = File(outputDir, "_cover.jpg")
@@ -344,24 +374,22 @@ class MainActivity : AppCompatActivity() {
                 if (exitCode == 0) {
                     finalPath = path
                     tmpM4a.delete()
-                    if (coverData != null) {
-                        File(outputDir, "_cover.jpg").delete()
-                    }
+                    File(outputDir, "_cover.jpg").delete()
                 } else {
-                    // Fallback: сохраняем M4A
                     val m4aPath = File(outputDir, "${path.nameWithoutExtension}.m4a")
                     tmpM4a.renameTo(m4aPath)
                     finalPath = m4aPath
-                    if (coverData != null) File(outputDir, "_cover.jpg").delete()
+                    File(outputDir, "_cover.jpg").delete()
                 }
             } else {
-                // Без FFmpeg — сохраняем M4A как есть
+                addLog("FFmpeg не найден, сохраняю M4A")
                 val m4aPath = File(outputDir, "${path.nameWithoutExtension}.m4a")
                 tmpM4a.renameTo(m4aPath)
                 finalPath = m4aPath
             }
 
             val sizeKb = finalPath.length() / 1024
+            addLog("Готово! ${finalPath.name} ($sizeKb КБ)")
 
             runOnUiThread {
                 progressbar.progress = 100
@@ -379,7 +407,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun findFFmpeg(): String? {
-        // Ищем ffmpeg в стандартных местах
         val candidates = listOf(
             "/system/bin/ffmpeg",
             "/system/xbin/ffmpeg",
@@ -390,19 +417,14 @@ class MainActivity : AppCompatActivity() {
         for (c in candidates) {
             if (File(c).exists() && File(c).canExecute()) return c
         }
-        // PATH
-        return try {
-            val process = Runtime.getRuntime().exec(arrayOf("which", "ffmpeg"))
-            val line = process.inputStream.bufferedReader().readLine()?.trim()
-            process.waitFor()
-            if (line != null && File(line).exists()) line else null
-        } catch (_: Exception) { null }
+        return null
     }
 
     private fun showError(msg: String) {
         isBusy = false
         setButtonState(false)
         statusText.text = "Ошибка"
+        addLog("ОШИБКА: $msg")
         AlertDialog.Builder(this)
             .setTitle("Ошибка")
             .setMessage(msg)
@@ -423,6 +445,22 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         } catch (e: Exception) {
             Toast.makeText(this, outputDir.absolutePath, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 1001 && resultCode == RESULT_OK && data != null) {
+            val uri = data.data ?: return
+            try {
+                val path = uri.path ?: return
+                // Простое отображение пути
+                selectedDir = File(path)
+                findViewById<TextView>(R.id.tvFolder).text = "Папка: $path"
+                addLog("Папка изменена: $path")
+            } catch (e: Exception) {
+                Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
