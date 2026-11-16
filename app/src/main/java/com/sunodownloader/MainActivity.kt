@@ -34,8 +34,12 @@ class MainActivity : AppCompatActivity() {
     private var trackTitle: String = ""
     private var songId: String = ""
     private var selectedDir: File? = null
+
     private val outputDir: File
         get() = selectedDir ?: File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Suno").apply { mkdirs() }
+
+    private val logFile: File
+        get() = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "suno_log.txt")
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,14 +75,9 @@ class MainActivity : AppCompatActivity() {
             openFolder()
         }
 
-        // Кнопка выбора папки
+        // Кнопка выбора папки — диалог со стандартными папками
         findViewById<Button>(R.id.btnBrowse).setOnClickListener {
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
-            try {
-                startActivityForResult(intent, 1001)
-            } catch (e: Exception) {
-                Toast.makeText(this, "Не удалось открыть выбор папки", Toast.LENGTH_SHORT).show()
-            }
+            showFolderDialog()
         }
 
         // Папка сохранения
@@ -115,6 +114,30 @@ class MainActivity : AppCompatActivity() {
         addLog("Приложение запущено.")
     }
 
+    private fun showFolderDialog() {
+        val options = arrayOf(
+            "Загрузки/Suno",
+            "Музыка/Suno",
+            "Документы/Suno",
+            "Видео/Suno"
+        )
+        val paths = listOf(
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Suno"),
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "Suno"),
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "Suno"),
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "Suno")
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Выберите папку для сохранения")
+            .setItems(options) { _, which ->
+                val dir = paths[which].apply { mkdirs() }
+                selectedDir = dir
+                findViewById<TextView>(R.id.tvFolder).text = "Папка: ${dir.absolutePath}"
+                addLog("Папка изменена: ${dir.absolutePath}")
+            }
+            .show()
+    }
+
     inner class DownloadBridge {
         @JavascriptInterface
         fun onAudioReady(b64: String, title: String, size: Long) {
@@ -139,10 +162,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addLog(msg: String) {
-        val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+        val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
         val line = "[$time] $msg\n"
-        val current = logText.text.toString()
-        logText.text = current + line
+
+        // Экран
+        logText.text = logText.text.toString() + line
+
+        // Файл
+        try {
+            logFile.appendText(line)
+        } catch (_: Exception) {}
     }
 
     fun startDownload(url: String) {
@@ -165,7 +194,8 @@ class MainActivity : AppCompatActivity() {
         setButtonState(true)
         progressbar.progress = 0
         statusText.text = "Запуск..."
-        addLog("Загрузка: $url")
+        addLog("=== Новая загрузка ===")
+        addLog("URL: $url")
 
         Thread {
             try {
@@ -181,6 +211,7 @@ class MainActivity : AppCompatActivity() {
                         val location = conn.getHeaderField("Location") ?: conn.url.toString()
                         conn.disconnect()
                         fullUrl = location
+                        addLog("Редирект: $fullUrl")
                     } catch (_: Exception) {}
                 }
 
@@ -213,11 +244,12 @@ class MainActivity : AppCompatActivity() {
                 loaded.await(30, TimeUnit.SECONDS)
 
                 if (loadError != null) {
+                    addLog("Ошибка загрузки страницы: $loadError")
                     runOnUiThread { showError("Ошибка загрузки: $loadError") }
                     return@Thread
                 }
 
-                runOnUiThread { addLog("Страница загружена. Ожидание Cloudflare...") }
+                addLog("Страница загружена. Ожидание Cloudflare...")
 
                 // Ждём SunoAudioDecoder
                 var decoderReady = false
@@ -245,16 +277,17 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (!decoderReady) {
+                    addLog("Cloudflare не прошёл за 30 сек")
                     runOnUiThread {
                         showError("Сервер не отвечает.\nCloudflare не прошёл.\nПопробуйте через минуту.")
                     }
                     return@Thread
                 }
 
+                addLog("Декодер готов. Скачивание аудио...")
                 runOnUiThread {
                     statusText.text = "Скачивание трека..."
                     progressbar.progress = 50
-                    addLog("Декодер готов. Скачивание аудио...")
                 }
 
                 // Вызываем getAudio через UI-поток
@@ -296,6 +329,8 @@ class MainActivity : AppCompatActivity() {
                 Thread.sleep(90000)
 
             } catch (e: Exception) {
+                addLog("ИСКЛЮЧЕНИЕ: ${e.javaClass.simpleName}: ${e.message}")
+                e.printStackTrace()
                 runOnUiThread { showError("Ошибка: ${e.message}") }
             }
         }.start()
@@ -305,7 +340,7 @@ class MainActivity : AppCompatActivity() {
         try {
             trackTitle = title
             val audioBytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
-            addLog("Аудио: ${size / 1024} КБ, Title: $title")
+            addLog("Аудио получено: ${size / 1024} КБ, Название: $title")
 
             statusText.text = "Сохранение..."
             progressbar.progress = 80
@@ -324,12 +359,13 @@ class MainActivity : AppCompatActivity() {
                     conn.disconnect()
                 } catch (_: Exception) {}
                 coverData = cover
-                if (cover != null) addLog("Обложка: ${cover.size / 1024} КБ")
+                if (cover != null) addLog("Обложка скачана: ${cover.size / 1024} КБ")
 
                 saveFile(audioBytes, title)
             }.start()
 
         } catch (e: Exception) {
+            addLog("Ошибка приёма: ${e.message}")
             showError("Ошибка: ${e.message}")
         }
     }
@@ -338,6 +374,9 @@ class MainActivity : AppCompatActivity() {
         try {
             val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim('.', ' ').take(150)
             val fileName = if (safeName.isNotEmpty()) safeName else "track"
+
+            addLog("Сохраняю в: ${outputDir.absolutePath}")
+            outputDir.mkdirs()
 
             var path = File(outputDir, "$fileName.mp3")
             var i = 1
@@ -348,12 +387,13 @@ class MainActivity : AppCompatActivity() {
 
             val tmpM4a = File(outputDir, "_tmp_${songId.take(8)}.m4a")
             tmpM4a.writeBytes(audioBytes)
+            addLog("Временный файл M4A: ${tmpM4a.length() / 1024} КБ")
 
             val ffmpegPath = findFFmpeg()
             var finalPath: File
 
             if (ffmpegPath != null) {
-                addLog("Конвертация в MP3...")
+                addLog("Конвертация в MP3 (ffmpeg: $ffmpegPath)...")
                 val cmd = mutableListOf(ffmpegPath, "-y", "-i", tmpM4a.absolutePath)
                 if (coverData != null && coverData!!.isNotEmpty()) {
                     val coverFile = File(outputDir, "_cover.jpg")
@@ -375,7 +415,9 @@ class MainActivity : AppCompatActivity() {
                     finalPath = path
                     tmpM4a.delete()
                     File(outputDir, "_cover.jpg").delete()
+                    addLog("MP3 готов: ${finalPath.length() / 1024} КБ")
                 } else {
+                    addLog("FFmpeg ошибка (код $exitCode), сохраняю M4A")
                     val m4aPath = File(outputDir, "${path.nameWithoutExtension}.m4a")
                     tmpM4a.renameTo(m4aPath)
                     finalPath = m4aPath
@@ -389,7 +431,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val sizeKb = finalPath.length() / 1024
-            addLog("Готово! ${finalPath.name} ($sizeKb КБ)")
+            addLog("ГОТОВО: ${finalPath.absolutePath} ($sizeKb КБ)")
 
             runOnUiThread {
                 progressbar.progress = 100
@@ -402,7 +444,8 @@ class MainActivity : AppCompatActivity() {
             }
 
         } catch (e: Exception) {
-            runOnUiThread { showError("Ошибка: ${e.message}") }
+            addLog("Ошибка сохранения: ${e.message}")
+            runOnUiThread { showError("Ошибка сохранения: ${e.message}") }
         }
     }
 
@@ -445,22 +488,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         } catch (e: Exception) {
             Toast.makeText(this, outputDir.absolutePath, Toast.LENGTH_LONG).show()
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 1001 && resultCode == RESULT_OK && data != null) {
-            val uri = data.data ?: return
-            try {
-                val path = uri.path ?: return
-                // Простое отображение пути
-                selectedDir = File(path)
-                findViewById<TextView>(R.id.tvFolder).text = "Папка: $path"
-                addLog("Папка изменена: $path")
-            } catch (e: Exception) {
-                Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
         }
     }
 
