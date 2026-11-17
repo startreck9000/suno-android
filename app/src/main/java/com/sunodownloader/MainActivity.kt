@@ -408,7 +408,18 @@ class MainActivity : AppCompatActivity() {
             if (wantMp3) {
                 addLog("Конвертация в MP3 (FFmpegX)...")
                 val ffmpeg = FFmpeg.initialize(this)
-                val cmd = "-y -i \"${tmpM4a.absolutePath}\" -codec:a libmp3lame -b:a 256k -id3v2_version 3 -metadata title=\"$title\" -metadata artist=Suno \"${path.absolutePath}\""
+
+                var cmd = "-y -i \"${tmpM4a.absolutePath}\""
+                var hasCover = false
+
+                if (coverData != null && coverData!!.isNotEmpty()) {
+                    val coverFile = File(outputDir, "_cover_${songId.take(8)}.jpg")
+                    coverFile.writeBytes(coverData!!)
+                    cmd += " -i \"${coverFile.absolutePath}\" -map 0:a -map 1:v -metadata:s:v title=\"Album cover\""
+                    hasCover = true
+                }
+
+                cmd += " -codec:a libmp3lame -b:a 256k -id3v2_version 3 -metadata title=\"$title\" -metadata artist=Suno \"${path.absolutePath}\""
 
                 val success = runBlocking {
                     ffmpeg.execute(cmd)
@@ -417,12 +428,14 @@ class MainActivity : AppCompatActivity() {
                 if (success && path.exists()) {
                     finalPath = path
                     tmpM4a.delete()
-                    addLog("MP3 готов: ${finalPath.length() / 1024} КБ")
+                    if (hasCover) File(outputDir, "_cover_${songId.take(8)}.jpg").delete()
+                    addLog("MP3 готов: ${finalPath.length() / 1024} КБ (обложка: ${if (hasCover) "да" else "нет"})")
                 } else {
                     addLog("FFmpeg ошибка, сохраняю M4A")
                     val m4aPath = File(outputDir, "${path.nameWithoutExtension}.m4a")
                     tmpM4a.renameTo(m4aPath)
                     finalPath = m4aPath
+                    if (hasCover) File(outputDir, "_cover_${songId.take(8)}.jpg").delete()
                 }
             } else {
                 addLog("Формат M4A выбран")
@@ -470,27 +483,12 @@ class MainActivity : AppCompatActivity() {
 
     fun openFolder() {
         val dir = outputDir
-        // Пробуем открыть через FileProvider (Android 7+)
-        try {
-            val uri = androidx.core.content.FileProvider.getUriForFile(
-                this, "$packageName.fileprovider", dir
-            )
-            val intent = Intent(Intent.ACTION_VIEW)
-            intent.setDataAndType(uri, "resource/folder")
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent)
-            return
-        } catch (_: Exception) {}
-        // Альтернатива: ACTION_GET_CONTENT
-        try {
-            val intent = Intent(Intent.ACTION_GET_CONTENT)
-            intent.type = "*/*"
-            intent.putExtra("initial_uri", Uri.fromFile(dir))
-            startActivity(Intent.createChooser(intent, "Открыть папку"))
-            return
-        } catch (_: Exception) {}
-        // Финальный fallback
-        Toast.makeText(this, "Папка: ${dir.absolutePath}\nОткройте файловым менеджером", Toast.LENGTH_LONG).show()
+        AlertDialog.Builder(this)
+            .setTitle("📂 Папка с файлами")
+            .setMessage(dir.absolutePath + "\n\nОткройте файловым менеджером:\nНастройки → Приложения → Файлы → Внутреннее хранилище → " + 
+                (dir.absolutePath.replace("/storage/emulated/0/", "")))
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     override fun onDestroy() {
