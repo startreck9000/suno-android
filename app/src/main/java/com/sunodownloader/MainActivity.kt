@@ -408,35 +408,21 @@ class MainActivity : AppCompatActivity() {
             if (wantMp3) {
                 addLog("Конвертация в MP3 (FFmpegX)...")
                 val ffmpeg = FFmpeg.initialize(this)
-                val args = mutableListOf("-y", "-i", tmpM4a.absolutePath)
-                if (coverData != null && coverData!!.isNotEmpty()) {
-                    val coverFile = File(outputDir, "_cover.jpg")
-                    coverFile.writeBytes(coverData!!)
-                    args += listOf("-i", coverFile.absolutePath, "-map", "0:a", "-map", "1:v")
-                }
-                args += listOf(
-                    "-codec:a", "libmp3lame", "-b:a", "256k",
-                    "-id3v2_version", "3",
-                    "-metadata", "title=$title",
-                    "-metadata", "artist=Suno",
-                    path.absolutePath
-                )
+                val cmd = "-y -i \"${tmpM4a.absolutePath}\" -codec:a libmp3lame -b:a 256k -id3v2_version 3 -metadata title=\"$title\" -metadata artist=Suno \"${path.absolutePath}\""
 
                 val success = runBlocking {
-                    ffmpeg.execute(args.toTypedArray())
+                    ffmpeg.execute(cmd)
                 }
 
                 if (success && path.exists()) {
                     finalPath = path
                     tmpM4a.delete()
-                    File(outputDir, "_cover.jpg").delete()
                     addLog("MP3 готов: ${finalPath.length() / 1024} КБ")
                 } else {
                     addLog("FFmpeg ошибка, сохраняю M4A")
                     val m4aPath = File(outputDir, "${path.nameWithoutExtension}.m4a")
                     tmpM4a.renameTo(m4aPath)
                     finalPath = m4aPath
-                    File(outputDir, "_cover.jpg").delete()
                 }
             } else {
                 addLog("Формат M4A выбран")
