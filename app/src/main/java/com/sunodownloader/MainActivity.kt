@@ -14,6 +14,8 @@ import android.webkit.WebViewClient
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.mzgs.ffmpegx.FFmpeg
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -111,26 +113,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Извлекаем ffmpeg из assets при первом запуске
-        extractFFmpeg()
-
         addLog("Приложение запущено.")
-    }
-
-    private fun extractFFmpeg() {
-        val target = File(filesDir, "ffmpeg")
-        if (target.exists() && target.canExecute()) return
-        try {
-            assets.open("ffmpeg").use { input ->
-                target.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-            target.setExecutable(true, false)
-            addLog("FFmpeg извлечён: ${target.length() / 1024} КБ")
-        } catch (e: Exception) {
-            addLog("Не удалось извлечь FFmpeg: ${e.message}")
-        }
     }
 
     private fun showFolderDialog() {
@@ -394,7 +377,6 @@ class MainActivity : AppCompatActivity() {
             val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim('.', ' ').take(150)
             val fileName = if (safeName.isNotEmpty()) safeName else "track"
 
-            // Формат из RadioButton
             val wantMp3 = findViewById<RadioButton>(R.id.rbMp3).isChecked
 
             addLog("Сохраняю в: ${outputDir.absolutePath}")
@@ -421,18 +403,18 @@ class MainActivity : AppCompatActivity() {
             tmpM4a.writeBytes(audioBytes)
             addLog("Временный файл M4A: ${tmpM4a.length() / 1024} КБ")
 
-            val ffmpegPath = findFFmpeg()
             var finalPath: File
 
-            if (wantMp3 && ffmpegPath != null) {
-                addLog("Конвертация в MP3 (ffmpeg: $ffmpegPath)...")
-                val cmd = mutableListOf(ffmpegPath, "-y", "-i", tmpM4a.absolutePath)
+            if (wantMp3) {
+                addLog("Конвертация в MP3 (FFmpegX)...")
+                val ffmpeg = FFmpeg.initialize(this)
+                val args = mutableListOf("-y", "-i", tmpM4a.absolutePath)
                 if (coverData != null && coverData!!.isNotEmpty()) {
                     val coverFile = File(outputDir, "_cover.jpg")
                     coverFile.writeBytes(coverData!!)
-                    cmd += listOf("-i", coverFile.absolutePath, "-map", "0:a", "-map", "1:v")
+                    args += listOf("-i", coverFile.absolutePath, "-map", "0:a", "-map", "1:v")
                 }
-                cmd += listOf(
+                args += listOf(
                     "-codec:a", "libmp3lame", "-b:a", "256k",
                     "-id3v2_version", "3",
                     "-metadata", "title=$title",
@@ -440,24 +422,24 @@ class MainActivity : AppCompatActivity() {
                     path.absolutePath
                 )
 
-                val process = ProcessBuilder(*cmd.toTypedArray()).redirectErrorStream(true).start()
-                val exitCode = process.waitFor()
+                val success = runBlocking {
+                    ffmpeg.execute(args.toTypedArray())
+                }
 
-                if (exitCode == 0) {
+                if (success && path.exists()) {
                     finalPath = path
                     tmpM4a.delete()
                     File(outputDir, "_cover.jpg").delete()
                     addLog("MP3 готов: ${finalPath.length() / 1024} КБ")
                 } else {
-                    addLog("FFmpeg ошибка (код $exitCode), сохраняю M4A")
+                    addLog("FFmpeg ошибка, сохраняю M4A")
                     val m4aPath = File(outputDir, "${path.nameWithoutExtension}.m4a")
                     tmpM4a.renameTo(m4aPath)
                     finalPath = m4aPath
                     File(outputDir, "_cover.jpg").delete()
                 }
             } else {
-                if (wantMp3) addLog("FFmpeg не найден на устройстве, сохраняю M4A")
-                else addLog("Формат M4A выбран")
+                addLog("Формат M4A выбран")
                 val m4aPath = File(outputDir, "${path.nameWithoutExtension}.m4a")
                 tmpM4a.renameTo(m4aPath)
                 finalPath = m4aPath
@@ -482,19 +464,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun findFFmpeg(): String? {
-        val candidates = listOf(
-            File(filesDir, "ffmpeg").absolutePath,
-            "/system/bin/ffmpeg",
-            "/system/xbin/ffmpeg",
-            "/data/local/bin/ffmpeg"
-        )
-        for (c in candidates) {
-            if (File(c).exists() && File(c).canExecute()) return c
-        }
-        return null
-    }
-
     private fun showError(msg: String) {
         isBusy = false
         setButtonState(false)
@@ -515,22 +484,27 @@ class MainActivity : AppCompatActivity() {
 
     fun openFolder() {
         val dir = outputDir
-        // Пробуем открыть через файловый менеджер
+        // Пробуем открыть через FileProvider (Android 7+)
         try {
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this, "$packageName.fileprovider", dir
+            )
             val intent = Intent(Intent.ACTION_VIEW)
-            intent.setDataAndType(Uri.fromFile(dir), "resource/folder")
+            intent.setDataAndType(uri, "resource/folder")
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(intent)
             return
         } catch (_: Exception) {}
-        // Альтернатива: открываем корневой /storage/emulated/0
+        // Альтернатива: ACTION_GET_CONTENT
         try {
-            val intent = Intent(Intent.ACTION_VIEW)
-            intent.setDataAndType(Uri.fromFile(File("/storage/emulated/0")), "resource/folder")
-            startActivity(intent)
+            val intent = Intent(Intent.ACTION_GET_CONTENT)
+            intent.type = "*/*"
+            intent.putExtra("initial_uri", Uri.fromFile(dir))
+            startActivity(Intent.createChooser(intent, "Открыть папку"))
             return
         } catch (_: Exception) {}
-        // Если ничего не открылось — показываем путь
-        Toast.makeText(this, "Папка: ${dir.absolutePath}", Toast.LENGTH_LONG).show()
+        // Финальный fallback
+        Toast.makeText(this, "Папка: ${dir.absolutePath}\nОткройте файловым менеджером", Toast.LENGTH_LONG).show()
     }
 
     override fun onDestroy() {
