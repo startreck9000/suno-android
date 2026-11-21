@@ -1,7 +1,7 @@
 package com.sunodownloader
 
-import android.Manifest
-import android.content.pm.PackageManager
+import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -11,18 +11,20 @@ import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import androidx.documentfile.provider.DocumentFile
+import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.ReturnCode
 import kotlinx.coroutines.*
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 class MainActivity : AppCompatActivity() {
@@ -34,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var resultCard: LinearLayout
     private lateinit var resultTitle: TextView
     private lateinit var resultSize: TextView
+    private lateinit var resultCover: ImageView
     private lateinit var logText: TextView
     private lateinit var tvFolder: TextView
 
@@ -57,29 +60,26 @@ class MainActivity : AppCompatActivity() {
         resultCard = findViewById(R.id.resultCard)
         resultTitle = findViewById(R.id.resultTitle)
         resultSize = findViewById(R.id.resultSize)
+        resultCover = findViewById(R.id.resultCover)
         logText = findViewById(R.id.logText)
         tvFolder = findViewById(R.id.tvFolder)
 
-        // Кнопки
         btnDownload.setOnClickListener {
-            val url = etUrl.text.toString().trim()
-            startDownload(url)
+            startDownload(etUrl.text.toString().trim())
         }
         findViewById<Button>(R.id.btnPaste).setOnClickListener { pasteFromClipboard() }
         findViewById<Button>(R.id.btnClear).setOnClickListener { etUrl.setText("") }
         findViewById<Button>(R.id.btnOpenFolder).setOnClickListener { openFolder() }
         findViewById<Button>(R.id.btnBrowse).setOnClickListener { pickFolder() }
 
-        // Toggle log
         var logVisible = false
         findViewById<Button>(R.id.btnToggleLog).setOnClickListener {
             logVisible = !logVisible
             logText.visibility = if (logVisible) View.VISIBLE else View.GONE
-            findViewById<Button>(R.id.btnToggleLog).text = if (logVisible) "−" else "+"
+            findViewById<Button>(R.id.btnToggleLog).text = if (logVisible) "\u2212" else "+"
         }
         findViewById<Button>(R.id.btnClearLog).setOnClickListener { logText.text = "" }
 
-        // Enter в поле
         etUrl.setOnEditorActionListener { v, _, _ ->
             startDownload(v.text.toString().trim()); true
         }
@@ -103,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         catch (_: Exception) { Toast.makeText(this, "Не удалось открыть выбор папки", Toast.LENGTH_SHORT).show() }
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 1001 && resultCode == RESULT_OK && data != null) {
@@ -153,40 +154,46 @@ class MainActivity : AppCompatActivity() {
 
         scope.launch {
             try {
-                // 1. Resolve
                 val songId = withContext(Dispatchers.IO) { resolveClipId(url) }
                 addLog("Song ID: $songId")
                 setStatus("Получение названия..."); progressbar.progress = 10
 
-                // 2. Title
-                val title = withContext(Dispatchers.IO) { getTitle(songId) }
+                val meta = withContext(Dispatchers.IO) { getTrackMeta(songId) }
+                val title = meta.title
                 addLog("Title: $title")
-                setStatus("Запрос доступа..."); progressbar.progress = 20
+                if (meta.coverUrl != null) addLog("Обложка: ${meta.coverUrl}")
 
-                // 3. Rights
+                // Обложка скачивается параллельно с запросом прав и аудио
+                val coverDeferred = async(Dispatchers.IO) { meta.coverUrl?.let { downloadCover(it) } }
+
+                setStatus("Запрос доступа..."); progressbar.progress = 20
                 val rights = withContext(Dispatchers.IO) { getRights(songId) }
                 addLog("Права получены")
                 setStatus("Скачивание аудио..."); progressbar.progress = 30
 
-                // 4. Download encrypted
                 val encData = withContext(Dispatchers.IO) { downloadEncrypted(songId) }
                 addLog("Скачано: ${encData.size / 1024} КБ")
                 setStatus("Расшифровка..."); progressbar.progress = 70
 
-                // 5. Decrypt
                 val plain = withContext(Dispatchers.IO) { decryptClip(songId, encData, rights) }
                 addLog("Расшифровано: ${plain.size / 1024} КБ")
-                setStatus("Сохранение..."); progressbar.progress = 85
 
-                // 6. Save
-                val savedFile = withContext(Dispatchers.IO) { saveAudio(plain, title, songId) }
-                val sizeKb = plain.size / 1024
+                val cover = coverDeferred.await()
+                if (cover != null) addLog("Обложка скачана: ${cover.size / 1024} КБ")
+
+                val wantMp3 = findViewById<RadioButton>(R.id.rbMp3).isChecked
+                setStatus(if (wantMp3) "Конвертация в MP3..." else "Сохранение M4A...")
+                progressbar.progress = 85
+
+                val (savedFile, savedSize) = withContext(Dispatchers.IO) { saveAudio(plain, title, songId, wantMp3, cover) }
+                val sizeKb = savedSize / 1024
                 addLog("Готово! ${savedFile.name} ($sizeKb КБ)")
 
                 progressbar.progress = 100
                 statusText.text = "Готово!"
                 resultTitle.text = savedFile.name
                 resultSize.text = "$sizeKb КБ"
+                showCover(cover)
                 resultCard.visibility = View.VISIBLE
                 setButtonState(false)
                 isBusy = false
@@ -207,22 +214,13 @@ class MainActivity : AppCompatActivity() {
         val directMatch = songRe.find(link)
         if (directMatch != null) return directMatch.groupValues[1].lowercase()
 
-        // Short link: follow redirect
-        val headReq = Request.Builder().url(link).head().build()
-        http.newCall(headReq).execute().use { r ->
-            val loc = r.header("Location") ?: ""
-            val locMatch = songRe.find(loc)
-            if (locMatch != null) return locMatch.groupValues[1].lowercase()
-        }
-
-        // GET and parse HTML
+        // Short link: follow redirect via GET (OkHttp уже проходит редирект), парсим HTML
         val getReq = Request.Builder().url(link).get().build()
         http.newCall(getReq).execute().use { r ->
-            val html = r.body.string()
+            val html = r.body!!.string()
             val htmlMatch = songRe.find(html)
             if (htmlMatch != null) return htmlMatch.groupValues[1].lowercase()
 
-            // Fallback: most frequent UUID
             val uuids = Regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}", RegexOption.IGNORE_CASE)
                 .findAll(html).map { it.value.lowercase() }.toList()
             if (uuids.isNotEmpty()) {
@@ -235,15 +233,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─── Step 2: Get title via oEmbed ───────────────────────────────────────
-    private fun getTitle(clip: String): String {
+    private data class TrackMeta(val title: String, val coverUrl: String?)
+
+    private fun getTrackMeta(clip: String): TrackMeta {
         return try {
-            val url = "https://studio-api-prod.suno.com/api/oembed?url=${java.net.URLEncoder.encode("https://suno.com/song/$clip", "UTF-8")}"
+            val encoded = java.net.URLEncoder.encode("https://suno.com/song/$clip", "UTF-8")
+            val url = "https://studio-api-prod.suno.com/api/oembed?url=$encoded"
             val req = Request.Builder().url(url).get().build()
-            val resp = http.newCall(req).execute().use { r ->
-                val json = JSONObject(r.body.string())
-                json.optString("title", clip.take(8))
+            http.newCall(req).execute().use { r ->
+                val json = JSONObject(r.body!!.string())
+                val title = json.optString("title", clip.take(8))
+                // oEmbed отдаёт картинку в thumbnail_url; если нет — фолбэк по CDN
+                val cover = json.optString("thumbnail_url", "").takeIf { it.isNotEmpty() }
+                    ?: "https://cdn2.suno.ai/image_large_$clip.jpeg"
+                TrackMeta(title, cover)
             }
-        } catch (_: Exception) { clip.take(8) }
+        } catch (_: Exception) {
+            TrackMeta(clip.take(8), "https://cdn2.suno.ai/image_large_$clip.jpeg")
+        }
+    }
+
+    // Скачивание обложки (JPEG)
+    private fun downloadCover(url: String): ByteArray? {
+        return try {
+            val req = Request.Builder().url(url).get().build()
+            http.newCall(req).execute().use { r ->
+                if (r.isSuccessful) r.body!!.bytes() else null
+            }
+        } catch (_: Exception) { null }
     }
 
     // ─── Step 3: Get playback rights ────────────────────────────────────────
@@ -253,17 +270,18 @@ class MainActivity : AppCompatActivity() {
             .put("content_type", "clip")).toString()
         val req = Request.Builder()
             .url("https://studio-api-prod.suno.com/api/mango/rights")
-            .post(okhttp3.RequestBody.create(body.toByteArray(), okhttp3.MediaType.parse("application/json")))
+            .post(body.toRequestBody("application/json".toMediaType()))
             .build()
         val resp = http.newCall(req).execute().use { r ->
             if (!r.isSuccessful) throw Exception("Сервер прав вернул ${r.code}")
-            val json = JSONObject(r.body.string())
+            val json = JSONObject(r.body!!.string())
             mapOf(
                 "key" to json.getString("key"),
                 "iv" to json.getString("iv"),
                 "glt" to json.getString("glt")
             )
         }
+        return resp
     }
 
     // ─── Step 4: Download encrypted audio ───────────────────────────────────
@@ -275,9 +293,13 @@ class MainActivity : AppCompatActivity() {
         for (url in urls) {
             try {
                 val req = Request.Builder().url(url).get().build()
-                val resp = http.newCall(req).execute().use { r ->
-                    if (r.isSuccessful) return r.body.bytes()
+                val resp = http.newCall(req).execute()
+                if (resp.isSuccessful) {
+                    val data = resp.body!!.bytes()
+                    resp.close()
+                    return data
                 }
+                resp.close()
             } catch (_: Exception) { continue }
         }
         throw Exception("Не удалось скачать аудиопоток.\nТрек приватный или CDN недоступен.")
@@ -291,7 +313,7 @@ class MainActivity : AppCompatActivity() {
         fun unwrap(pkgB64: String): ByteArray {
             val raw = android.util.Base64.decode(pkgB64, android.util.Base64.DEFAULT)
             val nonce = raw.copyOfRange(0, 12)
-            val ctTag = raw.copyOfRange(12, raw.size) // ciphertext + tag(16)
+            val ctTag = raw.copyOfRange(12, raw.size)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(gltHash, "AES"), GCMParameterSpec(128, nonce))
             cipher.updateAAD(aad)
@@ -301,11 +323,10 @@ class MainActivity : AppCompatActivity() {
         val contentKey = unwrap(rights["key"]!!)
         val contentIv = unwrap(rights["iv"]!!)
 
-        // AES-CTR: manual via ECB
         val ecb = Cipher.getInstance("AES/ECB/NoPadding")
         ecb.init(Cipher.ENCRYPT_MODE, SecretKeySpec(contentKey, "AES"))
         val plain = ByteArray(enc.size)
-        var counter = contentIv.clone() // 16-byte initial counter
+        var counter = contentIv.clone()
 
         var offset = 0
         while (offset < enc.size) {
@@ -314,7 +335,6 @@ class MainActivity : AppCompatActivity() {
             for (i in 0 until chunkLen) {
                 plain[offset + i] = (enc[offset + i].toInt() xor keystream[i].toInt()).toByte()
             }
-            // Increment counter (big-endian, 16 bytes)
             for (j in 15 downTo 0) {
                 val v = counter[j].toInt() and 0xFF
                 counter[j] = (v + 1).toByte()
@@ -323,7 +343,6 @@ class MainActivity : AppCompatActivity() {
             offset += 16
         }
 
-        // Verify: M4A starts with 'ftyp', WebM with 0x1A45DFA3
         val hasFtyp = plain.size > 8 && String(plain, 4, 4, Charsets.US_ASCII) == "ftyp"
         val hasWebm = plain.size >= 4 && (plain[0].toInt() and 0xFF) == 0x1A && (plain[1].toInt() and 0xFF) == 0x45
         if (!hasFtyp && !hasWebm) {
@@ -332,42 +351,112 @@ class MainActivity : AppCompatActivity() {
         return plain
     }
 
-    // ─── Step 6: Save file ──────────────────────────────────────────────────
-    private fun saveAudio(data: ByteArray, title: String, songId: String): File {
+    // ─── Step 6: Save file (M4A или MP3 + обложка) ──────────────────────────
+    private fun saveAudio(data: ByteArray, title: String, songId: String, wantMp3: Boolean, cover: ByteArray?): Pair<File, Long> {
         val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim('.', ' ').take(150)
         val baseName = if (safeName.isNotEmpty()) safeName else "track"
-        val ext = if (data.size > 4 && String(data, 4, 4, Charsets.US_ASCII) == "ftyp") "m4a" else "webm"
+        val isM4a = data.size > 4 && String(data, 4, 4, Charsets.US_ASCII) == "ftyp"
+        val srcExt = if (isM4a) "m4a" else "webm"
 
-        // Determine output directory
-        val outDir: File
-        val targetUri: Uri? = selectedUri
-        if (targetUri != null) {
-            // Use SAF (Storage Access Framework)
-            val displayName = "${baseName}.$ext"
-            val docUri = androidx.documentfile.provider.DocumentFile.fromTree(targetUri)
+        // Временный файл исходного аудио (FFmpeg работает только с путями, не с Uri)
+        val tmpSrc = File(cacheDir, "_src_${songId.take(8)}.$srcExt")
+        tmpSrc.writeBytes(data)
+
+        var converted: ByteArray? = null   // итоговые байты (MP3 после конвертации или оригинал)
+        var outExt = srcExt
+        var usedCover = false
+
+        if (wantMp3) {
+            converted = tryConvertToMp3(tmpSrc, title, cover)
+            if (converted != null) {
+                outExt = "mp3"
+                usedCover = cover != null && cover.isNotEmpty()
+                addLog("MP3 готов: ${converted.size / 1024} КБ (обложка: ${if (usedCover) "да" else "нет"})")
+            } else {
+                addLog("Конвертация в MP3 не удалась — сохраняю M4A")
+                outExt = srcExt
+            }
+        }
+
+        val finalData = converted ?: data
+        val displayName = "$baseName.$outExt"
+
+        // Сохраняем в выбранную папку (SAF) или в Downloads/Suno
+        val savedFile = if (selectedUri != null) {
+            val docUri = DocumentFile.fromTree(selectedUri!!)
                 ?.createFile("audio/*", displayName)
                 ?: throw Exception("Не удалось создать файл в выбранной папке")
-            contentResolver.openOutputStream(docUri)!!.use { it.write(data) }
-            // Return a dummy File for display purposes
-            return File("", displayName)
+            contentResolver.openOutputStream(docUri)!!.use { it.write(finalData) }
+            File("", displayName)
         } else {
-            // Fallback: Downloads/Suno
-            outDir = if (Build.VERSION.SDK_INT >= 29) {
-                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Suno")
-            } else {
-                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Suno")
+            val outDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Suno")
+            try {
+                outDir.mkdirs()
+                var path = File(outDir, displayName)
+                var i = 1
+                while (path.exists()) {
+                    path = File(outDir, "$baseName($i).$outExt")
+                    i++
+                }
+                path.writeBytes(finalData)
+                path
+            } catch (e: Exception) {
+                throw Exception("Нет доступа к папке Загрузки.\nВыберите другую папку кнопкой «Обзор».")
             }
-            outDir.mkdirs()
-
-            var path = File(outDir, "$baseName.$ext")
-            var i = 1
-            while (path.exists()) {
-                path = File(outDir, "$baseName($i).$ext")
-                i++
-            }
-            path.writeBytes(data)
-            return path
         }
+
+        tmpSrc.delete()
+        return Pair(savedFile, finalData.size.toLong())
+    }
+
+    // Конвертация M4A/WebM → MP3 (libmp3lame 256 kbps) + вшитая обложка (ID3v2 APIC).
+    // Возвращает байты MP3 или null при любой ошибке (тогда вызывающий сохраняет оригинал).
+    private fun tryConvertToMp3(src: File, title: String, cover: ByteArray?): ByteArray? {
+        val tmpMp3 = File(cacheDir, "_out_${System.currentTimeMillis()}.mp3")
+        var tmpCover: File? = null
+        try {
+            // Экранируем кавычки/бэкслаши в названии для безопасной вставки в команду
+            val safeTitle = title.replace("\"", "").replace("\\", "").trim().takeIf { it.isNotEmpty() } ?: "track"
+
+            var cmd = "-y -i \"${src.absolutePath}\""
+            if (cover != null && cover.isNotEmpty()) {
+                tmpCover = File(cacheDir, "_cover_${System.currentTimeMillis()}.jpg")
+                tmpCover.writeBytes(cover)
+                // Обложка кодируется как видеопоток mjpeg → FFmpeg сам кладёт его в ID3 APIC-тег
+                cmd += " -i \"${tmpCover.absolutePath}\" -map 0:a -map 1:v -c:v mjpeg -metadata:s:v title=\"Album cover\" -metadata:s:v comment=\"Cover (front)\""
+            }
+            cmd += " -c:a libmp3lame -b:a 256k -id3v2_version 3"
+            cmd += " -metadata title=\"$safeTitle\" -metadata artist=Suno \"${tmpMp3.absolutePath}\""
+
+            addLog("FFmpeg: $cmd")
+            val session = FFmpegKit.execute(cmd)
+            if (ReturnCode.isSuccess(session.getReturnCode()) && tmpMp3.exists() && tmpMp3.length() > 0) {
+                return tmpMp3.readBytes()
+            }
+            addLog("FFmpeg ошибка: ${session.getFailStackTrace()}")
+            return null
+        } catch (e: Exception) {
+            addLog("Ошибка FFmpeg: ${e.message}")
+            return null
+        } finally {
+            tmpMp3.delete()
+            tmpCover?.delete()
+        }
+    }
+
+    // Показывает миниатюру обложки в карточке результата
+    private fun showCover(cover: ByteArray?) {
+        if (cover == null || cover.isEmpty()) {
+            resultCover.visibility = View.GONE
+            return
+        }
+        val bmp = BitmapFactory.decodeByteArray(cover, 0, cover.size)
+        if (bmp == null) {
+            resultCover.visibility = View.GONE
+            return
+        }
+        resultCover.setImageBitmap(bmp)
+        resultCover.visibility = View.VISIBLE
     }
 
     // ─── UI helpers ─────────────────────────────────────────────────────────
@@ -379,8 +468,7 @@ class MainActivity : AppCompatActivity() {
         val time = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
         val line = "[$time] $msg\n"
         runOnUiThread {
-            val current = logText.text.toString()
-            logText.text = current + line
+            logText.text = logText.text.toString() + line
             logText.post { logText.scrollTo(0, logText.bottom) }
         }
     }
