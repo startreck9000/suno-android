@@ -1,0 +1,325 @@
+============================================= 
+  Suno MP3 Downloader - Build Log            
+  Date: 21.11.2026 22:44:31,39                        
+============================================= 
+[INFO] Python: for /f result 
+[INFO] Python 3.15.2 
+[INFO] Python architecture: 64-bit 
+[INFO] Clean done 
+[INFO] Creating venv... 
+[INFO] Installing requirements... 
+[INFO] Dependencies installed OK 
+[INFO] All imports verified 
+[INFO] ffmpeg.exe present 
+[INFO] ffmpeg.exe is x64 OK 
+[INFO] All source files present 
+[INFO] Mode: onedir 
+[INFO] === PyInstaller output === 
+115 DEPRECATION: Running PyInstaller as admin is not necessary nor sensible. Run PyInstaller from a non-administrator terminal. PyInstaller 7.0 will block this.
+396 INFO: PyInstaller: 6.22.3, contrib hooks: 2026.10
+397 INFO: Python: 3.15.2
+435 INFO: Platform: Windows-10-10.0.19045-SP0
+436 INFO: Python environment: D:\Загрузки\suno-downloader-v4\venv
+438 INFO: wrote D:\Загрузки\suno-downloader-v4\SunoDownloader.spec
+443 INFO: Removing temporary files and cleaning cache in C:\Users\Админ\AppData\Local\pyinstaller
+1237 INFO: Module search paths (PYTHONPATH):
+['D:\\Загрузки\\suno-downloader-v4\\venv\\Scripts\\pyinstaller.exe',
+ 'C:\\Program Files\\Python315\\python315.zip',
+ 'C:\\Program Files\\Python315\\DLLs',
+ 'C:\\Program Files\\Python315\\Lib',
+ 'C:\\Program Files\\Python315',
+ 'D:\\Загрузки\\suno-downloader-v4\\venv',
+ 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages',
+ 'D:\\Загрузки\\suno-downloader-v4']
+1886 INFO: Appending 'binaries' from .spec
+1886 INFO: checking Analysis
+1887 INFO: Building Analysis because Analysis-00.toc is non existent
+1887 INFO: Looking for Python shared library...
+1887 INFO: Using Python shared library: C:\Program Files\Python315\python315.dll
+1887 INFO: Running Analysis Analysis-00.toc
+1887 INFO: Target bytecode optimization level: 0
+1887 INFO: Initializing module dependency graph...
+1890 INFO: Initializing module graph hook caches...
+1936 INFO: Analyzing modules for base_library.zip ...
+4344 INFO: Processing standard module hook 'hook-encodings.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7548 INFO: Processing standard module hook 'hook-math.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+10346 INFO: Processing standard module hook 'hook-difflib.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+10374 INFO: Processing standard module hook 'hook-heapq.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+10926 INFO: Processing standard module hook 'hook-pickle.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+13046 INFO: Caching module dependency graph...
+13102 INFO: Analyzing D:\Загрузки\suno-downloader-v4\main.py
+13174 INFO: Processing standard module hook 'hook-platform.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+13259 INFO: Processing standard module hook 'hook-sysconfig.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+13268 INFO: Processing standard module hook 'hook-_ctypes.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+13280 INFO: Processing pre-find-module-path hook 'hook-tkinter.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+13283 INFO: TclTkInfo: initializing cached Tcl/Tk info...
+13945 INFO: Processing standard module hook 'hook-_tkinter.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+14092 INFO: Processing standard module hook 'hook-customtkinter.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+14302 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+14306 INFO: SetuptoolsInfo: initializing cached setuptools info...
+15461 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+16868 INFO: Processing standard module hook 'hook-urllib3.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+17138 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+17140 INFO: Setuptools: 'backports' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.backports'!
+17155 INFO: Processing standard module hook 'hook-setuptools.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+17184 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+17252 INFO: Processing pre-safe-import-module hook 'hook-jaraco.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+17254 INFO: Setuptools: 'jaraco' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.jaraco'!
+17280 INFO: Processing pre-safe-import-module hook 'hook-more_itertools.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+17282 INFO: Setuptools: 'more_itertools' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.more_itertools'!
+17675 INFO: Processing standard module hook 'hook-_osx_support.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+18446 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+18449 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+19888 INFO: Processing pre-safe-import-module hook 'hook-tomli.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+19890 INFO: Setuptools: 'tomli' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.tomli'!
+21441 INFO: Processing pre-safe-import-module hook 'hook-wheel.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+21443 INFO: Setuptools: 'wheel' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.wheel'!
+22512 INFO: Processing standard module hook 'hook-certifi.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+22775 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+23643 INFO: Processing standard module hook 'hook-Crypto.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+24993 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+25208 INFO: Processing standard module hook 'hook-xml.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+26825 INFO: Analyzing hidden import 'Crypto.Cipher.ARC2'
+26838 INFO: Analyzing hidden import 'Crypto.Cipher.ARC4'
+26846 INFO: Analyzing hidden import 'Crypto.Cipher.Blowfish'
+26855 INFO: Analyzing hidden import 'Crypto.Cipher.CAST'
+26863 INFO: Analyzing hidden import 'Crypto.Cipher.ChaCha20'
+26897 INFO: Analyzing hidden import 'Crypto.Cipher.ChaCha20_Poly1305'
+26942 INFO: Analyzing hidden import 'Crypto.Cipher.DES'
+26952 INFO: Analyzing hidden import 'Crypto.Cipher.DES3'
+26964 INFO: Analyzing hidden import 'Crypto.Cipher.PKCS1_OAEP'
+27664 INFO: Analyzing hidden import 'Crypto.Cipher.PKCS1_v1_5'
+27681 INFO: Analyzing hidden import 'Crypto.Cipher.Salsa20'
+27699 INFO: Analyzing hidden import 'Crypto.Cipher._ARC4'
+27699 INFO: Analyzing hidden import 'Crypto.Cipher._Salsa20'
+27700 INFO: Analyzing hidden import 'Crypto.Cipher._Salsa20_avx2_bmi2'
+27700 INFO: Analyzing hidden import 'Crypto.Cipher._chacha20'
+27700 INFO: Analyzing hidden import 'Crypto.Cipher._chacha20_avx2_bmi2'
+27701 INFO: Analyzing hidden import 'Crypto.Cipher._pkcs1_decode'
+27702 INFO: Analyzing hidden import 'Crypto.Cipher._raw_aes'
+27704 INFO: Analyzing hidden import 'Crypto.Cipher._raw_aesni'
+27705 INFO: Analyzing hidden import 'Crypto.Cipher._raw_arc2'
+27705 INFO: Analyzing hidden import 'Crypto.Cipher._raw_blowfish'
+27706 INFO: Analyzing hidden import 'Crypto.Cipher._raw_cast'
+27706 INFO: Analyzing hidden import 'Crypto.Cipher._raw_cbc'
+27707 INFO: Analyzing hidden import 'Crypto.Cipher._raw_cfb'
+27707 INFO: Analyzing hidden import 'Crypto.Cipher._raw_ctr'
+27707 INFO: Analyzing hidden import 'Crypto.Cipher._raw_des'
+27708 INFO: Analyzing hidden import 'Crypto.Cipher._raw_des3'
+27708 INFO: Analyzing hidden import 'Crypto.Cipher._raw_ecb'
+27709 INFO: Analyzing hidden import 'Crypto.Cipher._raw_eksblowfish'
+27709 INFO: Analyzing hidden import 'Crypto.Cipher._raw_ocb'
+27709 INFO: Analyzing hidden import 'Crypto.Cipher._raw_ofb'
+27710 INFO: Analyzing hidden import 'Crypto.Cipher._raw_xts'
+27710 INFO: Analyzing hidden import 'Crypto.Hash.BLAKE2b'
+27725 INFO: Analyzing hidden import 'Crypto.Hash.BLAKE2s'
+27744 INFO: Analyzing hidden import 'Crypto.Hash.KMAC128'
+27779 INFO: Analyzing hidden import 'Crypto.Hash.KangarooTwelve'
+27823 INFO: Analyzing hidden import 'Crypto.Hash.MD2'
+27839 INFO: Analyzing hidden import 'Crypto.Hash.MD4'
+27848 INFO: Analyzing hidden import 'Crypto.Hash.RIPEMD'
+27860 INFO: Analyzing hidden import 'Crypto.Hash.SHA'
+27862 INFO: Analyzing hidden import 'Crypto.Hash.SHAKE128'
+27873 INFO: Analyzing hidden import 'Crypto.Hash.SHAKE256'
+27880 INFO: Analyzing hidden import 'Crypto.Hash.TupleHash128'
+27896 INFO: Analyzing hidden import 'Crypto.Hash.TurboSHAKE256'
+27899 INFO: Analyzing hidden import 'Crypto.Hash._BLAKE2b'
+27900 INFO: Analyzing hidden import 'Crypto.Hash._BLAKE2s'
+27901 INFO: Analyzing hidden import 'Crypto.Hash._MD2'
+27901 INFO: Analyzing hidden import 'Crypto.Hash._MD4'
+27901 INFO: Analyzing hidden import 'Crypto.Hash._MD5'
+27902 INFO: Analyzing hidden import 'Crypto.Hash._RIPEMD160'
+27902 INFO: Analyzing hidden import 'Crypto.Hash._SHA1'
+27903 INFO: Analyzing hidden import 'Crypto.Hash._SHA224'
+27903 INFO: Analyzing hidden import 'Crypto.Hash._SHA224_shani'
+27904 INFO: Analyzing hidden import 'Crypto.Hash._SHA256'
+27904 INFO: Analyzing hidden import 'Crypto.Hash._SHA256_shani'
+27905 INFO: Analyzing hidden import 'Crypto.Hash._SHA384'
+27905 INFO: Analyzing hidden import 'Crypto.Hash._SHA512'
+27905 INFO: Analyzing hidden import 'Crypto.Hash._ghash_clmul'
+27906 INFO: Analyzing hidden import 'Crypto.Hash._ghash_portable'
+27906 INFO: Analyzing hidden import 'Crypto.Hash._k12'
+27907 INFO: Analyzing hidden import 'Crypto.Hash._k12_avx2_bmi2'
+27907 INFO: Analyzing hidden import 'Crypto.Hash._keccak'
+27907 INFO: Analyzing hidden import 'Crypto.Hash._keccak_avx2_bmi2'
+27908 INFO: Analyzing hidden import 'Crypto.Hash._poly1305'
+27908 INFO: Analyzing hidden import 'Crypto.Math._nat'
+27909 INFO: Analyzing hidden import 'Crypto.Math._nat_bmi2_adx'
+27909 INFO: Analyzing hidden import 'Crypto.Protocol.DH'
+28563 INFO: Analyzing hidden import 'Crypto.Protocol.HPKE'
+28768 INFO: Analyzing hidden import 'Crypto.Protocol.SecretSharing'
+28790 INFO: Analyzing hidden import 'Crypto.Protocol._scrypt'
+28791 INFO: Analyzing hidden import 'Crypto.PublicKey.DSA'
+28885 INFO: Analyzing hidden import 'Crypto.PublicKey.ElGamal'
+28913 INFO: Analyzing hidden import 'Crypto.PublicKey.MLDSA'
+28971 INFO: Analyzing hidden import 'Crypto.PublicKey._curve25519'
+28972 INFO: Analyzing hidden import 'Crypto.PublicKey._ec_lib'
+28976 INFO: Analyzing hidden import 'Crypto.PublicKey._ec_nat'
+28977 INFO: Analyzing hidden import 'Crypto.PublicKey._ec_nat_bmi2_adx'
+28978 INFO: Analyzing hidden import 'Crypto.PublicKey._ed25519'
+28978 INFO: Analyzing hidden import 'Crypto.PublicKey._edwards'
+28988 INFO: Analyzing hidden import 'Crypto.PublicKey._mldsa'
+28988 INFO: Analyzing hidden import 'Crypto.PublicKey._mldsa_avx2_bmi2'
+28989 INFO: Analyzing hidden import 'Crypto.PublicKey._mlkem'
+28990 INFO: Analyzing hidden import 'Crypto.PublicKey._mlkem_avx2_bmi2'
+28990 INFO: Analyzing hidden import 'Crypto.PublicKey._montgomery'
+28998 INFO: Analyzing hidden import 'Crypto.PublicKey._nist_ecc'
+29029 INFO: Analyzing hidden import 'Crypto.SelfTest'
+29038 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher'
+29039 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.common'
+29073 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_AES'
+29147 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_ARC2'
+29161 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_ARC4'
+29197 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_Blowfish'
+29217 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_CAST'
+29238 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_CBC'
+29378 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_CCM'
+29524 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_CFB'
+29561 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_CTR'
+29711 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_ChaCha20'
+29865 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_ChaCha20_Poly1305'
+29953 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_DES'
+29980 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_DES3'
+29999 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_EAX'
+30161 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_GCM'
+30332 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_GCM_SIV'
+30449 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_KW'
+30464 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_OCB'
+30616 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_OFB'
+30642 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_OpenPGP'
+30659 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_SIV'
+30713 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_Salsa20'
+30793 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_XTS'
+30853 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_pkcs1_15'
+30898 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_pkcs1_oaep'
+30930 INFO: Analyzing hidden import 'Crypto.SelfTest.Cipher.test_shared_objects'
+30942 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash'
+30943 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.common'
+30966 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_BLAKE2'
+31017 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_CMAC'
+31043 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_HMAC'
+31062 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_KMAC'
+31085 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_KangarooTwelve'
+31139 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_MD2'
+31142 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_MD4'
+31146 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_MD5'
+31149 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_Poly1305'
+31180 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_RIPEMD160'
+31182 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_SHA1'
+31185 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_SHA224'
+31198 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_SHA256'
+31210 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_SHA384'
+31217 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_SHA3_224'
+31224 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_SHA3_256'
+31229 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_SHA3_384'
+31234 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_SHA3_512'
+31241 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_SHA512'
+31255 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_SHAKE'
+31267 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_TupleHash'
+31291 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_TurboSHAKE'
+31325 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_cSHAKE'
+31343 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_keccak'
+31371 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_oneshot_digest'
+31383 INFO: Analyzing hidden import 'Crypto.SelfTest.Hash.test_shared_objects'
+31394 INFO: Analyzing hidden import 'Crypto.SelfTest.IO'
+31396 INFO: Analyzing hidden import 'Crypto.SelfTest.IO.test_PBES'
+31449 INFO: Analyzing hidden import 'Crypto.SelfTest.IO.test_PEM'
+31465 INFO: Analyzing hidden import 'Crypto.SelfTest.IO.test_PKCS8'
+31532 INFO: Analyzing hidden import 'Crypto.SelfTest.Math'
+31534 INFO: Analyzing hidden import 'Crypto.SelfTest.Math.test_Numbers'
+31703 INFO: Analyzing hidden import 'Crypto.SelfTest.Math.test_Primality'
+31714 INFO: Analyzing hidden import 'Crypto.SelfTest.Math.test_nat'
+31749 INFO: Analyzing hidden import 'Crypto.SelfTest.Protocol'
+31750 INFO: Analyzing hidden import 'Crypto.SelfTest.Protocol.test_HPKE'
+31825 INFO: Analyzing hidden import 'Crypto.SelfTest.Protocol.test_KDF'
+31946 INFO: Analyzing hidden import 'Crypto.SelfTest.Protocol.test_SecretSharing'
+31977 INFO: Analyzing hidden import 'Crypto.SelfTest.Protocol.test_ecdh'
+32050 INFO: Analyzing hidden import 'Crypto.SelfTest.Protocol.test_rfc1751'
+32141 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey'
+32142 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_DSA'
+32168 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_ECC_Curve25519'
+32198 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_ECC_Curve448'
+32223 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_ECC_Ed25519'
+32261 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_ECC_Ed448'
+32332 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_ECC_NIST'
+32512 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_ECC_secp256k1'
+32559 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_ElGamal'
+32577 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_Hybrid'
+32616 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_MLDSA'
+32686 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_MLKEM'
+32729 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_RSA'
+32779 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_import_Curve25519'
+32808 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_import_Curve448'
+32840 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_import_DSA'
+32880 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_import_ECC'
+33151 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_import_MLDSA'
+33250 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_import_MLKEM'
+33329 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_import_RSA'
+33381 INFO: Analyzing hidden import 'Crypto.SelfTest.PublicKey.test_import_passphrase'
+33419 INFO: Analyzing hidden import 'Crypto.SelfTest.Random'
+33421 INFO: Analyzing hidden import 'Crypto.SelfTest.Random.test_random'
+33443 INFO: Analyzing hidden import 'Crypto.SelfTest.Signature'
+33444 INFO: Analyzing hidden import 'Crypto.SelfTest.Signature.test_dss'
+33572 INFO: Analyzing hidden import 'Crypto.SelfTest.Signature.test_eddsa'
+33601 INFO: Analyzing hidden import 'Crypto.SelfTest.Signature.test_mldsa'
+33712 INFO: Analyzing hidden import 'Crypto.SelfTest.Signature.test_pkcs1_15'
+33765 INFO: Analyzing hidden import 'Crypto.SelfTest.Signature.test_pss'
+33810 INFO: Analyzing hidden import 'Crypto.SelfTest.Util'
+33812 INFO: Analyzing hidden import 'Crypto.SelfTest.Util.test_Counter'
+33816 INFO: Analyzing hidden import 'Crypto.SelfTest.Util.test_Padding'
+33835 INFO: Analyzing hidden import 'Crypto.SelfTest.Util.test_asn1'
+33927 INFO: Analyzing hidden import 'Crypto.SelfTest.Util.test_cpu_features'
+33932 INFO: Analyzing hidden import 'Crypto.SelfTest.Util.test_number'
+33960 INFO: Analyzing hidden import 'Crypto.SelfTest.Util.test_raw_api'
+34048 INFO: Analyzing hidden import 'Crypto.SelfTest.Util.test_rfc1751'
+34058 INFO: Analyzing hidden import 'Crypto.SelfTest.Util.test_strxor'
+34085 INFO: Analyzing hidden import 'Crypto.SelfTest.Util.test_threads'
+34103 INFO: Analyzing hidden import 'Crypto.SelfTest.__main__'
+34107 INFO: Analyzing hidden import 'Crypto.SelfTest.plugin'
+34116 INFO: Analyzing hidden import 'Crypto.Util._base64'
+34117 INFO: Analyzing hidden import 'Crypto.Util._cpuid_c'
+34117 INFO: Analyzing hidden import 'Crypto.Util._strxor'
+34118 INFO: Processing module hooks (post-graph stage)...
+35527 INFO: Processing standard module hook 'hook-webbrowser.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+37060 INFO: Processing standard module hook 'hook-_tkinter.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks'
+37073 INFO: Performing binary vs. data reclassification (70 entries)
+38578 INFO: Looking for ctypes DLLs
+38611 WARNING: Ignoring AppKit.framework/AppKit imported from D:\Загрузки\suno-downloader-v4\venv\Lib\site-packages\darkdetect\_mac_detect.py - only basenames are supported with ctypes imports!
+38767 INFO: Analyzing run-time hooks ...
+38775 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+38788 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+38795 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+38802 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+38807 INFO: Including run-time hook 'pyi_rth__tkinter.py' from 'D:\\Загрузки\\suno-downloader-v4\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+38843 INFO: Creating base_library.zip...
+38914 INFO: Looking for dynamic libraries
+40329 INFO: Extra DLL search directories (AddDllDirectory): []
+40329 INFO: Extra DLL search directories (PATH): []
+42266 INFO: Warnings written to D:\Загрузки\suno-downloader-v4\build\SunoDownloader\warn-SunoDownloader.txt
+42429 INFO: Graph cross-reference written to D:\Загрузки\suno-downloader-v4\build\SunoDownloader\xref-SunoDownloader.html
+42515 INFO: checking PYZ
+42515 INFO: Building PYZ because PYZ-00.toc is non existent
+42515 INFO: Building PYZ (ZlibArchive) D:\Загрузки\suno-downloader-v4\build\SunoDownloader\PYZ-00.pyz
+43199 INFO: Building PYZ (ZlibArchive) D:\Загрузки\suno-downloader-v4\build\SunoDownloader\PYZ-00.pyz completed successfully.
+43241 INFO: checking PKG
+43241 INFO: Building PKG because PKG-00.toc is non existent
+43241 INFO: Building PKG (CArchive) SunoDownloader.pkg
+43280 INFO: Building PKG (CArchive) SunoDownloader.pkg completed successfully.
+43281 INFO: Bootloader D:\Загрузки\suno-downloader-v4\venv\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+43282 INFO: checking EXE
+43282 INFO: Building EXE because EXE-00.toc is non existent
+43282 INFO: Building EXE from EXE-00.toc
+43282 INFO: Copying bootloader EXE to D:\Загрузки\suno-downloader-v4\build\SunoDownloader\SunoDownloader.exe
+43416 INFO: Copying icon to EXE
+43530 INFO: Copying 0 resources to EXE
+43530 INFO: Embedding manifest in EXE
+43618 INFO: Appending PKG archive to EXE
+43791 INFO: Fixing EXE headers
+44349 INFO: Building EXE from EXE-00.toc completed successfully.
+44354 INFO: checking COLLECT
+44354 INFO: Building COLLECT because COLLECT-00.toc is non existent
+44354 INFO: Building COLLECT COLLECT-00.toc
+45609 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+45628 INFO: Build complete! The results are available in: D:\Загрузки\suno-downloader-v4\dist
+[OK] dist\SunoDownloader\SunoDownloader.exe = 6 MB 
+[OK] Build completed successfully 

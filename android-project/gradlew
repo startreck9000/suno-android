@@ -1,0 +1,13 @@
+#!/bin/sh
+# Gradle start script (Unix)
+APP_NAME="Gradle"
+APP_BASE_NAME=`basename "$0"`
+
+dirname=`dirname "$0"`
+CLASSPATH=$dirname/gradle/wrapper/gradle-wrapper.jar
+
+exec java \
+  "-Dorg.gradle.appname=$APP_BASE_NAME" \
+  -classpath "$CLASSPATH" \
+  org.gradle.wrapper.GradleWrapperMain \
+  "$@"
