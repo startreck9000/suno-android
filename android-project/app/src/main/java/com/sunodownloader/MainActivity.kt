@@ -11,7 +11,6 @@ import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.documentfile.provider.DocumentFile
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
 import kotlinx.coroutines.*
@@ -243,7 +242,6 @@ class MainActivity : AppCompatActivity() {
             http.newCall(req).execute().use { r ->
                 val json = JSONObject(r.body!!.string())
                 val title = json.optString("title", clip.take(8))
-                // oEmbed отдаёт картинку в thumbnail_url; если нет — фолбэк по CDN
                 val cover = json.optString("thumbnail_url", "").takeIf { it.isNotEmpty() }
                     ?: "https://cdn2.suno.ai/image_large_$clip.jpeg"
                 TrackMeta(title, cover)
@@ -358,23 +356,20 @@ class MainActivity : AppCompatActivity() {
         val isM4a = data.size > 4 && String(data, 4, 4, Charsets.US_ASCII) == "ftyp"
         val srcExt = if (isM4a) "m4a" else "webm"
 
-        // Временный файл исходного аудио (FFmpeg работает только с путями, не с Uri)
+        // Временный файл исходного аудио
         val tmpSrc = File(cacheDir, "_src_${songId.take(8)}.$srcExt")
         tmpSrc.writeBytes(data)
 
-        var converted: ByteArray? = null   // итоговые байты (MP3 после конвертации или оригинал)
+        var converted: ByteArray? = null
         var outExt = srcExt
-        var usedCover = false
 
         if (wantMp3) {
             converted = tryConvertToMp3(tmpSrc, title, cover)
             if (converted != null) {
                 outExt = "mp3"
-                usedCover = cover != null && cover.isNotEmpty()
-                addLog("MP3 готов: ${converted.size / 1024} КБ (обложка: ${if (usedCover) "да" else "нет"})")
+                addLog("MP3 готов: ${converted.size / 1024} КБ")
             } else {
-                addLog("Конвертация в MP3 не удалась — сохраняю M4A")
-                outExt = srcExt
+                addLog("Конвертация не удалась — сохраняю M4A")
             }
         }
 
@@ -382,12 +377,19 @@ class MainActivity : AppCompatActivity() {
         val displayName = "$baseName.$outExt"
 
         // Сохраняем в выбранную папку (SAF) или в Downloads/Suno
-        val savedFile = if (selectedUri != null) {
-            val docUri = DocumentFile.fromTree(selectedUri!!)
-                ?.createFile("audio/*", displayName)
-                ?: throw Exception("Не удалось создать файл в выбранной папке")
+        val savedSize = finalData.size.toLong()
+        if (selectedUri != null) {
+            val values = android.content.ContentValues().apply {
+                put(android.provider.OpenableColumns.DISPLAY_NAME, displayName)
+                put("mime_type", "audio/*")
+            }
+            val docUri = try {
+                contentResolver.insert(selectedUri!!, values)
+                    ?: throw Exception("insert returned null")
+            } catch (e: Exception) {
+                throw Exception("Не удалось создать файл в выбранной папке")
+            }
             contentResolver.openOutputStream(docUri)!!.use { it.write(finalData) }
-            File("", displayName)
         } else {
             val outDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Suno")
             try {
@@ -399,30 +401,26 @@ class MainActivity : AppCompatActivity() {
                     i++
                 }
                 path.writeBytes(finalData)
-                path
             } catch (e: Exception) {
                 throw Exception("Нет доступа к папке Загрузки.\nВыберите другую папку кнопкой «Обзор».")
             }
         }
 
         tmpSrc.delete()
-        return Pair(savedFile, finalData.size.toLong())
+        return Pair(File(displayName), savedSize)
     }
 
-    // Конвертация M4A/WebM → MP3 (libmp3lame 256 kbps) + вшитая обложка (ID3v2 APIC).
-    // Возвращает байты MP3 или null при любой ошибке (тогда вызывающий сохраняет оригинал).
+    // Конвертация M4A/WebM → MP3 (libmp3lame 256 kbps) + обложка (ID3v2 APIC)
     private fun tryConvertToMp3(src: File, title: String, cover: ByteArray?): ByteArray? {
         val tmpMp3 = File(cacheDir, "_out_${System.currentTimeMillis()}.mp3")
         var tmpCover: File? = null
         try {
-            // Экранируем кавычки/бэкслаши в названии для безопасной вставки в команду
             val safeTitle = title.replace("\"", "").replace("\\", "").trim().takeIf { it.isNotEmpty() } ?: "track"
 
             var cmd = "-y -i \"${src.absolutePath}\""
             if (cover != null && cover.isNotEmpty()) {
                 tmpCover = File(cacheDir, "_cover_${System.currentTimeMillis()}.jpg")
                 tmpCover.writeBytes(cover)
-                // Обложка кодируется как видеопоток mjpeg → FFmpeg сам кладёт его в ID3 APIC-тег
                 cmd += " -i \"${tmpCover.absolutePath}\" -map 0:a -map 1:v -c:v mjpeg -metadata:s:v title=\"Album cover\" -metadata:s:v comment=\"Cover (front)\""
             }
             cmd += " -c:a libmp3lame -b:a 256k -id3v2_version 3"
@@ -444,7 +442,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Показывает миниатюру обложки в карточке результата
+    // Показывает миниатюру обложки
     private fun showCover(cover: ByteArray?) {
         if (cover == null || cover.isEmpty()) {
             resultCover.visibility = View.GONE
