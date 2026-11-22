@@ -3,7 +3,6 @@ package com.sunodownloader
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.OpenableColumns
@@ -11,6 +10,7 @@ import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.mzgs.ffmpegx.FFmpeg
 import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -424,49 +424,35 @@ class MainActivity : AppCompatActivity() {
         return Pair(File(displayName), savedSize)
     }
 
-    // Конвертация через отдельный процесс (Service) чтобы нативный краш FFmpeg
-    // не убил главное приложение. Если воркер упадёт — возвращаем null (M4A).
+    // Конвертация M4A/WebM → MP3 через FFmpegX (та же библиотека что в рабочей версии от 17.11)
     private fun tryConvertToMp3(src: File, title: String, cover: ByteArray?): ByteArray? {
         val tmpMp3 = File(cacheDir, "_out_${System.currentTimeMillis()}.mp3")
-        val resultFile = File(cacheDir, "_convert_result")
         var tmpCover: File? = null
         try {
-            resultFile.delete()
+            val safeTitle = title.replace("\"", "").replace("\\", "").trim().ifEmpty { "track" }
 
+            var cmd = "-y -i \"${src.absolutePath}\""
             if (cover != null && cover.isNotEmpty()) {
                 tmpCover = File(cacheDir, "_cover_${System.currentTimeMillis()}.jpg")
                 tmpCover.writeBytes(cover)
+                cmd += " -i \"${tmpCover.absolutePath}\" -map 0:a -map 1:v -metadata:s:v title=\"Album cover\""
             }
+            cmd += " -codec:a libmp3lame -b:a 256k -id3v2_version 3 -metadata title=\"$safeTitle\" -metadata artist=Suno \"${tmpMp3.absolutePath}\""
 
-            val intent = Intent().apply {
-                setClassName("com.sunodownloader", "com.sunodownloader.ConvertService")
-                putExtra("src", src.absolutePath)
-                putExtra("out", tmpMp3.absolutePath)
-                putExtra("title", title)
-                putExtra("cover", tmpCover?.absolutePath ?: "")
-                putExtra("result", resultFile.absolutePath)
-            }
-            startService(intent)
+            addLog("FFmpeg: $cmd")
+            fileLog("FFmpeg CMD: $cmd")
 
-            // Ждём результат до 90 секунд
-            var waited = 0L
-            while (waited < 90_000) {
-                Thread.sleep(500)
-                waited += 500
-                if (resultFile.exists()) break
-            }
+            val ffmpeg = FFmpeg.initialize(this@MainActivity)
+            val success = runBlocking { ffmpeg.execute(cmd) }
 
-            val ok = resultFile.exists() && resultFile.readText().trim() == "OK"
-            resultFile.delete()
-
-            if (ok && tmpMp3.exists() && tmpMp3.length() > 0) {
+            if (success && tmpMp3.exists() && tmpMp3.length() > 0) {
                 return tmpMp3.readBytes()
             }
             addLog("FFmpeg конвертация не удалась")
-            fileLog("FFmpeg: FAIL (timed out or error)")
+            fileLog("FFmpeg: FAIL")
             return null
         } catch (e: Exception) {
-            addLog("Ошибка конвертации: ${e.message}")
+            addLog("Ошибка FFmpeg: ${e.message}")
             fileLog("FFmpeg EXCEPTION: ${e.message}")
             return null
         } finally {
