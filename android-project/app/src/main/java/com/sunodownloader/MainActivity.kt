@@ -428,9 +428,10 @@ class MainActivity : AppCompatActivity() {
     // не убил главное приложение. Если воркер упадёт — возвращаем null (M4A).
     private fun tryConvertToMp3(src: File, title: String, cover: ByteArray?): ByteArray? {
         val tmpMp3 = File(cacheDir, "_out_${System.currentTimeMillis()}.mp3")
+        val resultFile = File(cacheDir, "_convert_result")
         var tmpCover: File? = null
         try {
-            File(filesDir, "_convert_result").delete()
+            resultFile.delete()
 
             if (cover != null && cover.isNotEmpty()) {
                 tmpCover = File(cacheDir, "_cover_${System.currentTimeMillis()}.jpg")
@@ -442,6 +443,7 @@ class MainActivity : AppCompatActivity() {
                 putExtra("out", tmpMp3.absolutePath)
                 putExtra("title", title)
                 putExtra("cover", tmpCover?.absolutePath ?: "")
+                putExtra("result", resultFile.absolutePath)
             }
             startService(intent)
 
@@ -450,10 +452,9 @@ class MainActivity : AppCompatActivity() {
             while (waited < 90_000) {
                 Thread.sleep(500)
                 waited += 500
-                if (File(filesDir, "_convert_result").exists()) break
+                if (resultFile.exists()) break
             }
 
-            val resultFile = File(filesDir, "_convert_result")
             val ok = resultFile.exists() && resultFile.readText().trim() == "OK"
             resultFile.delete()
 
@@ -461,7 +462,7 @@ class MainActivity : AppCompatActivity() {
                 return tmpMp3.readBytes()
             }
             addLog("FFmpeg конвертация не удалась")
-            fileLog("FFmpeg: FAIL (result=${if (resultFile.exists()) "missing" else "FAIL"})")
+            fileLog("FFmpeg: FAIL (timed out or error)")
             return null
         } catch (e: Exception) {
             addLog("Ошибка конвертации: ${e.message}")
