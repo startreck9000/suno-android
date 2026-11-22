@@ -16,6 +16,7 @@ class ConvertService : Service() {
         val outPath = intent?.getStringExtra("out") ?: ""
         val title = intent?.getStringExtra("title") ?: "track"
         val coverPath = intent?.getStringExtra("cover") ?: ""
+        val resultPath = intent?.getStringExtra("result") ?: ""
 
         var success = false
         try {
@@ -37,7 +38,7 @@ class ConvertService : Service() {
         }
 
         try {
-            File(filesDir, "_convert_result").writeText(if (success) "OK" else "FAIL")
+            File(resultPath).writeText(if (success) "OK" else "FAIL")
         } catch (_: Exception) {}
 
         stopSelf()
