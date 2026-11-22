@@ -1,11 +1,9 @@
 package com.sunodownloader
 
 import android.content.Intent
-import android.content.SharedPreferences
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.provider.OpenableColumns
 import android.view.View
 import android.widget.*
@@ -46,22 +44,16 @@ class MainActivity : AppCompatActivity() {
         .readTimeout(60, TimeUnit.SECONDS)
         .followRedirects(true)
         .build()
-    private lateinit var prefs: SharedPreferences
-    private var logFile: File? = null
     private var logFirstWrite = true
+    private var progressJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        prefs = getSharedPreferences("suno_prefs", MODE_PRIVATE)
-
-        // Лог: перезапись при каждом запуске (во внутреннюю папку приложения)
-        try {
-            logFile = File(filesDir, "suno_log.txt")
-            logFirstWrite = true
-            fileLog("=== Запуск приложения ===")
-        } catch (_: Exception) {}
+        // Лог: перезапись при каждом запуске
+        logFirstWrite = true
+        fileLog("=== Запуск приложения ===")
 
         etUrl = findViewById(R.id.etUrl)
         btnDownload = findViewById(R.id.btnDownload)
@@ -81,6 +73,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnClear).setOnClickListener { etUrl.setText("") }
         findViewById<Button>(R.id.btnOpenFolder).setOnClickListener { openFolder() }
         findViewById<Button>(R.id.btnBrowse).setOnClickListener { pickFolder() }
+        findViewById<Button>(R.id.btnViewLog).setOnClickListener { showLogFile() }
 
         var logVisible = false
         findViewById<Button>(R.id.btnToggleLog).setOnClickListener {
@@ -94,26 +87,9 @@ class MainActivity : AppCompatActivity() {
             startDownload(v.text.toString().trim()); true
         }
 
-        // Восстанавливаем сохранённую папку или запрашиваем выбор
-        val savedUri = prefs.getString("save_uri", null)
-        if (savedUri != null) {
-            selectedUri = Uri.parse(savedUri)
-            try {
-                contentResolver.takePersistableUriPermission(selectedUri!!,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                val name = getTreeName(selectedUri!!)
-                tvFolder.text = "Папка: $name"
-            } catch (_: Exception) {
-                selectedUri = null
-                tvFolder.text = "Папка: не выбрана"
-            }
-        } else {
-            tvFolder.text = "Папка: не выбрана"
-        }
-
+        tvFolder.text = "Папка: не выбрана"
         addLog("Приложение запущено.")
 
-        // Если папка не выбрана — сразу открываем выбор
         if (selectedUri == null) {
             val dlg = AlertDialog.Builder(this)
                 .setTitle("Выберите папку для сохранения")
@@ -124,12 +100,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ─── File logging (перезапись при первом вызове после запуска) ──────────
+    // ─── File logging ───────────────────────────────────────────────────────
+    private fun getLogFile(): File = File(filesDir, "suno_log.txt")
+
     private fun fileLog(msg: String) {
         try {
-            val lf = logFile ?: return
             val time = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
             val line = "[$time] $msg\n"
+            val lf = getLogFile()
             if (logFirstWrite) {
                 java.io.FileWriter(lf, false).use { it.write(line) }
                 logFirstWrite = false
@@ -137,6 +115,36 @@ class MainActivity : AppCompatActivity() {
                 java.io.FileWriter(lf, true).use { it.append(line) }
             }
         } catch (_: Exception) {}
+    }
+
+    private fun showLogFile() {
+        try {
+            val content = getLogFile().readText()
+            AlertDialog.Builder(this)
+                .setTitle("Лог (${getLogFile().length()} байт)")
+                .setMessage(content)
+                .setPositiveButton("ОК", null)
+                .show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Лог пуст или недоступен", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ─── Smooth progress ticker ─────────────────────────────────────────────
+    private fun startProgressTicker(target: Int) {
+        progressJob?.cancel()
+        progressJob = scope.launch {
+            while (progressbar.progress < target) {
+                delay(400)
+                progressbar.progress += 1
+                if (progressbar.progress >= target) break
+            }
+        }
+    }
+
+    private fun stopProgressTicker() {
+        progressJob?.cancel()
+        progressJob = null
     }
 
     // ─── Clipboard ──────────────────────────────────────────────────────────
@@ -164,8 +172,6 @@ class MainActivity : AppCompatActivity() {
                 contentResolver.takePersistableUriPermission(uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 selectedUri = uri
-                // Сохраняем URI чтобы не просили каждый раз
-                prefs.edit().putString("save_uri", uri.toString()).apply()
                 val name = getTreeName(uri)
                 tvFolder.text = "Папка: $name"
                 addLog("Папка: $name")
@@ -180,10 +186,10 @@ class MainActivity : AppCompatActivity() {
             contentResolver.query(uri, null, null, null, null)?.use { c ->
                 if (c.moveToFirst()) {
                     val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (idx >= 0) c.getString(idx) else uri.lastPathSegment ?: "Папка"
-                } else "Папка"
-            } ?: "Папка"
-        } catch (_: Exception) { "Папка" }
+                    if (idx >= 0) c.getString(idx) else uri.lastPathSegment ?: "папка"
+                } else uri.lastPathSegment ?: "папка"
+            } ?: uri.lastPathSegment ?: "папка"
+        } catch (_: Exception) { uri.lastPathSegment ?: "папка" }
     }
 
     // ─── Download logic ─────────────────────────────────────────────────────
@@ -214,12 +220,13 @@ class MainActivity : AppCompatActivity() {
         progressbar.progress = 0
         statusText.text = "Начинаю..."
         addLog("Загрузка: $url")
+        startProgressTicker(10)
 
         scope.launch {
             try {
                 val songId = withContext(Dispatchers.IO) { resolveClipId(url) }
                 addLog("Song ID: $songId")
-                setStatus("Получение названия..."); progressbar.progress = 10
+                setStatus("Получение названия..."); startProgressTicker(15)
 
                 val meta = withContext(Dispatchers.IO) { getTrackMeta(songId) }
                 val title = meta.title
@@ -228,14 +235,14 @@ class MainActivity : AppCompatActivity() {
 
                 val coverDeferred = async(Dispatchers.IO) { meta.coverUrl?.let { downloadCover(it) } }
 
-                setStatus("Запрос доступа..."); progressbar.progress = 20
+                setStatus("Запрос доступа..."); startProgressTicker(25)
                 val rights = withContext(Dispatchers.IO) { getRights(songId) }
                 addLog("Права получены")
-                setStatus("Скачивание аудио..."); progressbar.progress = 30
+                setStatus("Скачивание аудио..."); startProgressTicker(50)
 
                 val encData = withContext(Dispatchers.IO) { downloadEncrypted(songId) }
                 addLog("Скачано: ${encData.size / 1024} КБ")
-                setStatus("Расшифровка..."); progressbar.progress = 70
+                setStatus("Расшифровка..."); startProgressTicker(70)
 
                 val plain = withContext(Dispatchers.IO) { decryptClip(songId, encData, rights) }
                 addLog("Расшифровано: ${plain.size / 1024} КБ")
@@ -245,12 +252,13 @@ class MainActivity : AppCompatActivity() {
 
                 val wantMp3 = findViewById<RadioButton>(R.id.rbMp3).isChecked
                 setStatus(if (wantMp3) "Конвертация в MP3..." else "Сохранение M4A...")
-                progressbar.progress = 85
+                startProgressTicker(85)
 
                 val (savedName, savedSize) = withContext(Dispatchers.IO) { saveAudio(plain, title, songId, wantMp3, cover) }
                 val sizeKb = savedSize / 1024
                 addLog("Готово! $savedName ($sizeKb КБ)")
 
+                stopProgressTicker()
                 progressbar.progress = 100
                 statusText.text = "Готово!"
                 resultTitle.text = savedName
@@ -261,6 +269,7 @@ class MainActivity : AppCompatActivity() {
                 isBusy = false
 
             } catch (e: Exception) {
+                stopProgressTicker()
                 val msg = e.message ?: e.javaClass.simpleName
                 addLog("ОШИБКА: $msg")
                 val sw = java.io.StringWriter()
@@ -439,7 +448,6 @@ class MainActivity : AppCompatActivity() {
         val displayName = "$baseName.$outExt"
         val savedSize = finalData.size.toLong()
 
-        // Сохраняем через SAF (выбранная папка)
         val treeUri = selectedUri ?: throw Exception("Папка не выбрана")
         val mime = if (outExt == "mp3") "audio/mpeg" else "audio/mp4"
         val docUri = android.provider.DocumentsContract.createDocument(
@@ -530,7 +538,7 @@ class MainActivity : AppCompatActivity() {
     private fun setButtonState(busy: Boolean) {
         runOnUiThread {
             btnDownload.isEnabled = !busy
-            btnDownload.text = if (busy) "⏳ Загрузка..." else "⬇ Загрузить"
+            btnDownload.text = if (busy) "⏳ Загрузка..." else "⬇  Загрузить"
             etUrl.isEnabled = !busy
         }
     }
@@ -547,6 +555,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        stopProgressTicker()
         scope.cancel()
         http.dispatcher.executorService.shutdown()
         http.connectionPool.evictAll()
