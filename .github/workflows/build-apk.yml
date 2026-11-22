@@ -36,7 +36,9 @@ jobs:
       - name: Rename APK
         run: |
           cd android-project/app/build/outputs/apk/debug/
-          if [ -f app-debug-arm64-v8a.apk ]; then
+          if [ -f app-arm64-v8a-debug.apk ]; then
+            mv app-arm64-v8a-debug.apk suno-downloader-debug.apk
+          elif [ -f app-debug-arm64-v8a.apk ]; then
             mv app-debug-arm64-v8a.apk suno-downloader-debug.apk
           elif [ -f app-debug.apk ]; then
             mv app-debug.apk suno-downloader-debug.apk
