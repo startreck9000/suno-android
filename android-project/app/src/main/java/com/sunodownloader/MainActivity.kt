@@ -438,7 +438,8 @@ class MainActivity : AppCompatActivity() {
                 tmpCover.writeBytes(cover)
             }
 
-            val intent = Intent(this, ConvertService::class.java).apply {
+            val intent = Intent().apply {
+                setClassName("com.sunodownloader", "com.sunodownloader.ConvertService")
                 putExtra("src", src.absolutePath)
                 putExtra("out", tmpMp3.absolutePath)
                 putExtra("title", title)
