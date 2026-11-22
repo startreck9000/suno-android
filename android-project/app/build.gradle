@@ -5,15 +5,14 @@ plugins {
 
 android {
     namespace 'com.sunodownloader'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.sunodownloader"
-        minSdk 24          // Android 7.0+
+        minSdk 24
         targetSdk 34
-        versionCode 5
-        versionName "5.0"
-
+        versionCode 6
+        versionName "6.0"
     }
 
     buildTypes {
@@ -31,7 +30,6 @@ android {
         jvmTarget = '17'
     }
 
-    // Принудительно только 64-bit APK
     splits {
         abi {
             reset()
@@ -48,9 +46,6 @@ dependencies {
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'androidx.documentfile:documentfile:1.0.1'
-    // FFmpeg (libmp3lame) для конвертации M4A → MP3 и вшивания обложки (ID3v2).
-    // Активный форк FFmpegKit: оригинал com.arthenica удалён с Maven Central в 2025.
-    // LGPL, содержит arm64-v8a + x86_64, minSdk 24. Пакет и API те же: com.arthenica.ffmpegkit.
-    implementation 'dev.ffmpegkit-maintained:ffmpeg-kit-audio:8.1.7'
+    // FFmpeg (libmp3lame) — та же библиотека что в рабочей версии от 17.11
+    implementation 'com.github.mzgs:FFmpegX-Android:3.0.0'
 }
