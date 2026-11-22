@@ -118,12 +118,12 @@ class MainActivity : AppCompatActivity() {
 
         // Если папка не выбрана — сразу открываем выбор
         if (selectedUri == null) {
-            AlertDialog.Builder(this)
+            val dlg = AlertDialog.Builder(this)
                 .setTitle("Выберите папку для сохранения")
-                .setMessage("Выберите папку, куда будут сохраняться скачанные треки.\n\nЭто нужно сделать один раз.")
-                .setPositiveButton("Выбрать папку", null) { _, _ -> pickFolder() }
+                .setMessage("Выберите папку, куда будут сохраняться треки.\n\nЭто нужно сделать один раз.")
+                .setPositiveButton("Выбрать папку", android.content.DialogInterface.OnClickListener { _, _ -> pickFolder() })
                 .setNegativeButton("Позже", null)
-                .show()
+            dlg.show()
         }
     }
 
@@ -203,11 +203,11 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (selectedUri == null) {
-            AlertDialog.Builder(this)
+            val dlg = AlertDialog.Builder(this)
                 .setTitle("Нет папки для сохранения")
                 .setMessage("Сначала выберите папку кнопкой «Обзор».")
-                .setPositiveButton("Выбрать", null) { _, _ -> pickFolder() }
-                .show()
+                .setPositiveButton("Выбрать", android.content.DialogInterface.OnClickListener { _, _ -> pickFolder() })
+            dlg.show()
             return
         }
 
