@@ -56,12 +56,9 @@ class MainActivity : AppCompatActivity() {
 
         prefs = getSharedPreferences("suno_prefs", MODE_PRIVATE)
 
-        // Лог: перезапись при каждом запуске
+        // Лог: перезапись при каждом запуске (во внутреннюю папку приложения)
         try {
-            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val sunoDir = File(dir, "Suno")
-            if (!sunoDir.exists()) sunoDir.mkdirs()
-            logFile = File(sunoDir, "suno_log.txt")
+            logFile = File(filesDir, "suno_log.txt")
             logFirstWrite = true
             fileLog("=== Запуск приложения ===")
         } catch (_: Exception) {}
@@ -444,12 +441,10 @@ class MainActivity : AppCompatActivity() {
 
         // Сохраняем через SAF (выбранная папка)
         val treeUri = selectedUri ?: throw Exception("Папка не выбрана")
-        val values = android.content.ContentValues().apply {
-            put(android.provider.OpenableColumns.DISPLAY_NAME, displayName)
-            put("mime_type", "audio/*")
-        }
-        val docUri = contentResolver.insert(treeUri, values)
-            ?: throw Exception("Не удалось создать файл в выбранной папке")
+        val mime = if (outExt == "mp3") "audio/mpeg" else "audio/mp4"
+        val docUri = android.provider.DocumentsContract.createDocument(
+            contentResolver, treeUri, mime, displayName
+        ) ?: throw Exception("Не удалось создать файл в выбранной папке")
         contentResolver.openOutputStream(docUri)!!.use { it.write(finalData) }
 
         tmpSrc.delete()
