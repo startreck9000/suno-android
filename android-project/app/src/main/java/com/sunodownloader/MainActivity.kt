@@ -11,8 +11,6 @@ import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
 import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -20,6 +18,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
+import java.io.FileWriter
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
@@ -47,10 +46,19 @@ class MainActivity : AppCompatActivity() {
         .readTimeout(60, TimeUnit.SECONDS)
         .followRedirects(true)
         .build()
+    private var logFile: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        try {
+            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val sunoDir = File(dir, "Suno")
+            if (!sunoDir.exists()) sunoDir.mkdirs()
+            logFile = File(sunoDir, "suno_log.txt")
+            fileLog("=== Запуск приложения ===")
+        } catch (_: Exception) {}
 
         etUrl = findViewById(R.id.etUrl)
         btnDownload = findViewById(R.id.btnDownload)
@@ -84,6 +92,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         addLog("Приложение запущено.")
+    }
+
+    // ─── File logging ───────────────────────────────────────────────────────
+    private fun fileLog(msg: String) {
+        try {
+            val lf = logFile ?: return
+            val time = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            FileWriter(lf, true).use { it.append("[$time] $msg\n") }
+        } catch (_: Exception) {}
     }
 
     // ─── Clipboard ──────────────────────────────────────────────────────────
@@ -162,7 +179,6 @@ class MainActivity : AppCompatActivity() {
                 addLog("Title: $title")
                 if (meta.coverUrl != null) addLog("Обложка: ${meta.coverUrl}")
 
-                // Обложка скачивается параллельно с запросом прав и аудио
                 val coverDeferred = async(Dispatchers.IO) { meta.coverUrl?.let { downloadCover(it) } }
 
                 setStatus("Запрос доступа..."); progressbar.progress = 20
@@ -200,6 +216,9 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 val msg = e.message ?: e.javaClass.simpleName
                 addLog("ОШИБКА: $msg")
+                val sw = java.io.StringWriter()
+                e.printStackTrace(java.io.PrintWriter(sw))
+                fileLog("STACKTRACE:\n${sw.toString()}")
                 showError(msg)
             }
         }
@@ -209,11 +228,9 @@ class MainActivity : AppCompatActivity() {
     private fun resolveClipId(link: String): String {
         val songRe = Regex("/song/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})", RegexOption.IGNORE_CASE)
 
-        // Direct /song/<uuid>
         val directMatch = songRe.find(link)
         if (directMatch != null) return directMatch.groupValues[1].lowercase()
 
-        // Short link: follow redirect via GET (OkHttp уже проходит редирект), парсим HTML
         val getReq = Request.Builder().url(link).get().build()
         http.newCall(getReq).execute().use { r ->
             val html = r.body!!.string()
@@ -251,7 +268,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Скачивание обложки (JPEG)
     private fun downloadCover(url: String): ByteArray? {
         return try {
             val req = Request.Builder().url(url).get().build()
@@ -349,14 +365,13 @@ class MainActivity : AppCompatActivity() {
         return plain
     }
 
-    // ─── Step 6: Save file (M4A или MP3 + обложка) ──────────────────────────
+    // ─── Step 6: Save file ──────────────────────────────────────────────────
     private fun saveAudio(data: ByteArray, title: String, songId: String, wantMp3: Boolean, cover: ByteArray?): Pair<File, Long> {
         val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim('.', ' ').take(150)
         val baseName = if (safeName.isNotEmpty()) safeName else "track"
         val isM4a = data.size > 4 && String(data, 4, 4, Charsets.US_ASCII) == "ftyp"
         val srcExt = if (isM4a) "m4a" else "webm"
 
-        // Временный файл исходного аудио
         val tmpSrc = File(cacheDir, "_src_${songId.take(8)}.$srcExt")
         tmpSrc.writeBytes(data)
 
@@ -376,7 +391,6 @@ class MainActivity : AppCompatActivity() {
         val finalData = converted ?: data
         val displayName = "$baseName.$outExt"
 
-        // Сохраняем в выбранную папку (SAF) или в Downloads/Suno
         val savedSize = finalData.size.toLong()
         if (selectedUri != null) {
             val values = android.content.ContentValues().apply {
@@ -410,31 +424,48 @@ class MainActivity : AppCompatActivity() {
         return Pair(File(displayName), savedSize)
     }
 
-    // Конвертация M4A/WebM → MP3 (libmp3lame 256 kbps) + обложка (ID3v2 APIC)
+    // Конвертация через отдельный процесс (Service) чтобы нативный краш FFmpeg
+    // не убил главное приложение. Если воркер упадёт — возвращаем null (M4A).
     private fun tryConvertToMp3(src: File, title: String, cover: ByteArray?): ByteArray? {
         val tmpMp3 = File(cacheDir, "_out_${System.currentTimeMillis()}.mp3")
         var tmpCover: File? = null
         try {
-            val safeTitle = title.replace("\"", "").replace("\\", "").trim().takeIf { it.isNotEmpty() } ?: "track"
+            File(filesDir, "_convert_result").delete()
 
-            var cmd = "-y -i \"${src.absolutePath}\""
             if (cover != null && cover.isNotEmpty()) {
                 tmpCover = File(cacheDir, "_cover_${System.currentTimeMillis()}.jpg")
                 tmpCover.writeBytes(cover)
-                cmd += " -i \"${tmpCover.absolutePath}\" -map 0:a -map 1:v -c:v mjpeg -metadata:s:v title=\"Album cover\" -metadata:s:v comment=\"Cover (front)\""
             }
-            cmd += " -c:a libmp3lame -b:a 256k -id3v2_version 3"
-            cmd += " -metadata title=\"$safeTitle\" -metadata artist=Suno \"${tmpMp3.absolutePath}\""
 
-            addLog("FFmpeg: $cmd")
-            val session = FFmpegKit.execute(cmd)
-            if (ReturnCode.isSuccess(session.getReturnCode()) && tmpMp3.exists() && tmpMp3.length() > 0) {
+            val intent = Intent(this, ConvertService::class.java).apply {
+                putExtra("src", src.absolutePath)
+                putExtra("out", tmpMp3.absolutePath)
+                putExtra("title", title)
+                putExtra("cover", tmpCover?.absolutePath ?: "")
+            }
+            startService(intent)
+
+            // Ждём результат до 90 секунд
+            var waited = 0L
+            while (waited < 90_000) {
+                Thread.sleep(500)
+                waited += 500
+                if (File(filesDir, "_convert_result").exists()) break
+            }
+
+            val resultFile = File(filesDir, "_convert_result")
+            val ok = resultFile.exists() && resultFile.readText().trim() == "OK"
+            resultFile.delete()
+
+            if (ok && tmpMp3.exists() && tmpMp3.length() > 0) {
                 return tmpMp3.readBytes()
             }
-            addLog("FFmpeg ошибка: ${session.getFailStackTrace()}")
+            addLog("FFmpeg конвертация не удалась")
+            fileLog("FFmpeg: FAIL (result=${if (resultFile.exists()) "missing" else "FAIL"})")
             return null
         } catch (e: Exception) {
-            addLog("Ошибка FFmpeg: ${e.message}")
+            addLog("Ошибка конвертации: ${e.message}")
+            fileLog("FFmpeg EXCEPTION: ${e.message}")
             return null
         } finally {
             tmpMp3.delete()
@@ -442,7 +473,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Показывает миниатюру обложки
     private fun showCover(cover: ByteArray?) {
         if (cover == null || cover.isEmpty()) {
             resultCover.visibility = View.GONE
@@ -464,9 +494,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun addLog(msg: String) {
         val time = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-        val line = "[$time] $msg\n"
+        val line = "[$time] $msg"
+        fileLog(line)
         runOnUiThread {
-            logText.text = logText.text.toString() + line
+            logText.text = logText.text.toString() + line + "\n"
             logText.post { logText.scrollTo(0, logText.bottom) }
         }
     }
