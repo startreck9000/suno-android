@@ -1,4 +1,4 @@
-ackage com.sunodownloader
+package com.sunodownloader
 
 import android.app.Service
 import android.content.Intent
@@ -36,7 +36,6 @@ class ConvertService : Service() {
             success = false
         }
 
-        // Результат в файл (простой IPC)
         try {
             File(filesDir, "_convert_result").writeText(if (success) "OK" else "FAIL")
         } catch (_: Exception) {}
