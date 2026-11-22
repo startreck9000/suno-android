@@ -1,6 +1,7 @@
 package com.sunodownloader
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
@@ -18,7 +19,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
-import java.io.FileWriter
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
@@ -46,17 +46,23 @@ class MainActivity : AppCompatActivity() {
         .readTimeout(60, TimeUnit.SECONDS)
         .followRedirects(true)
         .build()
+    private lateinit var prefs: SharedPreferences
     private var logFile: File? = null
+    private var logFirstWrite = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        prefs = getSharedPreferences("suno_prefs", MODE_PRIVATE)
+
+        // Лог: перезапись при каждом запуске
         try {
             val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             val sunoDir = File(dir, "Suno")
             if (!sunoDir.exists()) sunoDir.mkdirs()
             logFile = File(sunoDir, "suno_log.txt")
+            logFirstWrite = true
             fileLog("=== Запуск приложения ===")
         } catch (_: Exception) {}
 
@@ -91,15 +97,48 @@ class MainActivity : AppCompatActivity() {
             startDownload(v.text.toString().trim()); true
         }
 
+        // Восстанавливаем сохранённую папку или запрашиваем выбор
+        val savedUri = prefs.getString("save_uri", null)
+        if (savedUri != null) {
+            selectedUri = Uri.parse(savedUri)
+            try {
+                contentResolver.takePersistableUriPermission(selectedUri!!,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                val name = getTreeName(selectedUri!!)
+                tvFolder.text = "Папка: $name"
+            } catch (_: Exception) {
+                selectedUri = null
+                tvFolder.text = "Папка: не выбрана"
+            }
+        } else {
+            tvFolder.text = "Папка: не выбрана"
+        }
+
         addLog("Приложение запущено.")
+
+        // Если папка не выбрана — сразу открываем выбор
+        if (selectedUri == null) {
+            AlertDialog.Builder(this)
+                .setTitle("Выберите папку для сохранения")
+                .setMessage("Выберите папку, куда будут сохраняться скачанные треки.\n\nЭто нужно сделать один раз.")
+                .setPositiveButton("Выбрать папку", null) { _, _ -> pickFolder() }
+                .setNegativeButton("Позже", null)
+                .show()
+        }
     }
 
-    // ─── File logging ───────────────────────────────────────────────────────
+    // ─── File logging (перезапись при первом вызове после запуска) ──────────
     private fun fileLog(msg: String) {
         try {
             val lf = logFile ?: return
             val time = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-            FileWriter(lf, true).use { it.append("[$time] $msg\n") }
+            val line = "[$time] $msg\n"
+            if (logFirstWrite) {
+                java.io.FileWriter(lf, false).use { it.write(line) }
+                logFirstWrite = false
+            } else {
+                java.io.FileWriter(lf, true).use { it.append(line) }
+            }
         } catch (_: Exception) {}
     }
 
@@ -125,8 +164,11 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == 1001 && resultCode == RESULT_OK && data != null) {
             val uri = data.data ?: return
             try {
-                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                contentResolver.takePersistableUriPermission(uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 selectedUri = uri
+                // Сохраняем URI чтобы не просили каждый раз
+                prefs.edit().putString("save_uri", uri.toString()).apply()
                 val name = getTreeName(uri)
                 tvFolder.text = "Папка: $name"
                 addLog("Папка: $name")
@@ -158,6 +200,14 @@ class MainActivity : AppCompatActivity() {
                 .setTitle("Неверная ссылка")
                 .setMessage("Введите ссылку вида:\nhttps://suno.com/s/...\nили\nhttps://suno.com/song/<uuid>")
                 .setPositiveButton("OK", null).show()
+            return
+        }
+        if (selectedUri == null) {
+            AlertDialog.Builder(this)
+                .setTitle("Нет папки для сохранения")
+                .setMessage("Сначала выберите папку кнопкой «Обзор».")
+                .setPositiveButton("Выбрать", null) { _, _ -> pickFolder() }
+                .show()
             return
         }
 
@@ -200,13 +250,13 @@ class MainActivity : AppCompatActivity() {
                 setStatus(if (wantMp3) "Конвертация в MP3..." else "Сохранение M4A...")
                 progressbar.progress = 85
 
-                val (savedFile, savedSize) = withContext(Dispatchers.IO) { saveAudio(plain, title, songId, wantMp3, cover) }
+                val (savedName, savedSize) = withContext(Dispatchers.IO) { saveAudio(plain, title, songId, wantMp3, cover) }
                 val sizeKb = savedSize / 1024
-                addLog("Готово! ${savedFile.name} ($sizeKb КБ)")
+                addLog("Готово! $savedName ($sizeKb КБ)")
 
                 progressbar.progress = 100
                 statusText.text = "Готово!"
-                resultTitle.text = savedFile.name
+                resultTitle.text = savedName
                 resultSize.text = "$sizeKb КБ"
                 showCover(cover)
                 resultCard.visibility = View.VISIBLE
@@ -365,8 +415,8 @@ class MainActivity : AppCompatActivity() {
         return plain
     }
 
-    // ─── Step 6: Save file ──────────────────────────────────────────────────
-    private fun saveAudio(data: ByteArray, title: String, songId: String, wantMp3: Boolean, cover: ByteArray?): Pair<File, Long> {
+    // ─── Step 6: Save file (только через SAF) ───────────────────────────────
+    private fun saveAudio(data: ByteArray, title: String, songId: String, wantMp3: Boolean, cover: ByteArray?): Pair<String, Long> {
         val safeName = title.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim('.', ' ').take(150)
         val baseName = if (safeName.isNotEmpty()) safeName else "track"
         val isM4a = data.size > 4 && String(data, 4, 4, Charsets.US_ASCII) == "ftyp"
@@ -390,41 +440,23 @@ class MainActivity : AppCompatActivity() {
 
         val finalData = converted ?: data
         val displayName = "$baseName.$outExt"
-
         val savedSize = finalData.size.toLong()
-        if (selectedUri != null) {
-            val values = android.content.ContentValues().apply {
-                put(android.provider.OpenableColumns.DISPLAY_NAME, displayName)
-                put("mime_type", "audio/*")
-            }
-            val docUri = try {
-                contentResolver.insert(selectedUri!!, values)
-                    ?: throw Exception("insert returned null")
-            } catch (e: Exception) {
-                throw Exception("Не удалось создать файл в выбранной папке")
-            }
-            contentResolver.openOutputStream(docUri)!!.use { it.write(finalData) }
-        } else {
-            val outDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Suno")
-            try {
-                outDir.mkdirs()
-                var path = File(outDir, displayName)
-                var i = 1
-                while (path.exists()) {
-                    path = File(outDir, "$baseName($i).$outExt")
-                    i++
-                }
-                path.writeBytes(finalData)
-            } catch (e: Exception) {
-                throw Exception("Нет доступа к папке Загрузки.\nВыберите другую папку кнопкой «Обзор».")
-            }
+
+        // Сохраняем через SAF (выбранная папка)
+        val treeUri = selectedUri ?: throw Exception("Папка не выбрана")
+        val values = android.content.ContentValues().apply {
+            put(android.provider.OpenableColumns.DISPLAY_NAME, displayName)
+            put("mime_type", "audio/*")
         }
+        val docUri = contentResolver.insert(treeUri, values)
+            ?: throw Exception("Не удалось создать файл в выбранной папке")
+        contentResolver.openOutputStream(docUri)!!.use { it.write(finalData) }
 
         tmpSrc.delete()
-        return Pair(File(displayName), savedSize)
+        return Pair(displayName, savedSize)
     }
 
-    // Конвертация M4A/WebM → MP3 через FFmpegX (та же библиотека что в рабочей версии от 17.11)
+    // Конвертация M4A/WebM → MP3 через FFmpegX
     private fun tryConvertToMp3(src: File, title: String, cover: ByteArray?): ByteArray? {
         val tmpMp3 = File(cacheDir, "_out_${System.currentTimeMillis()}.mp3")
         var tmpCover: File? = null
@@ -514,7 +546,7 @@ class MainActivity : AppCompatActivity() {
             try { startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "resource/folder")) }
             catch (_: Exception) { Toast.makeText(this, "Откройте файловый менеджер", Toast.LENGTH_LONG).show() }
         } else {
-            Toast.makeText(this, Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + "/Suno", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Папка не выбрана", Toast.LENGTH_LONG).show()
         }
     }
 
